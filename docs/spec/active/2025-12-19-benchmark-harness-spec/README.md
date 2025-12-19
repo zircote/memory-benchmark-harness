@@ -31,17 +31,17 @@ A comprehensive benchmark harness to validate the benefits of git-native semanti
 
 ## Current Status
 
-🔴 **DRAFT** - Requirements elicitation in progress
+🟡 **DRAFT** - Specification complete, awaiting approval
 
 ## Key Documents
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| REQUIREMENTS.md | Pending | Product requirements document |
-| ARCHITECTURE.md | Pending | Technical design |
-| IMPLEMENTATION_PLAN.md | Pending | Phased task breakdown |
-| RESEARCH_NOTES.md | Pending | Research findings |
-| DECISIONS.md | Pending | Architecture Decision Records |
+| [REQUIREMENTS.md](./REQUIREMENTS.md) | ✅ Complete | Product requirements with revised 4-phase structure |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | ✅ Complete | Technical design with MemorySystemAdapter pattern |
+| [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) | ✅ Complete | Detailed task breakdown for all phases |
+| [DECISIONS.md](./DECISIONS.md) | ✅ Complete | 12 Architecture Decision Records |
+| [CHANGELOG.md](./CHANGELOG.md) | ✅ Complete | Change history |
 
 ## Quick Links
 
@@ -50,7 +50,18 @@ A comprehensive benchmark harness to validate the benefits of git-native semanti
 
 ## Success Criteria
 
-1. Demonstrate measurable improvement over RAG baseline on memory abilities
-2. All evaluations reproducible via Docker with single command
-3. Results formatted for academic publication with statistical rigor
-4. Phase-gated development enabling early validation
+1. ✅ Statistical significance (p < 0.05 with Holm-Bonferroni correction) as primary metric
+2. ✅ Two-way comparison: git-notes-memory-manager vs no-memory baseline
+3. ✅ All evaluations reproducible via Docker with single command
+4. ✅ Results formatted for arXiv publication with bootstrap confidence intervals
+5. ✅ Phase-gated development: Phase 0 → Phase 1 → Phase 2 → Phase 3
+6. ✅ 500 samples validated by human annotators (100 per benchmark)
+
+## Key Decisions (ADRs)
+
+| ADR | Decision | Impact |
+|-----|----------|--------|
+| ADR-012 | Simplified to 2-way comparison | Faster delivery, cleaner narrative |
+| ADR-005 | Unified MemorySystemAdapter | Single interface for all benchmarks |
+| ADR-004 | Added Phase 0 (2 weeks) | Reduced Phase 1 risk |
+| ADR-001 | MemoryAgentBench in Phase 2 | Validates git version advantage |
