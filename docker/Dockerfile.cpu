@@ -1,0 +1,69 @@
+# Memory Benchmark Harness - CPU Image
+# Base image for running benchmarks without GPU acceleration
+#
+# Usage:
+#   docker build -f docker/Dockerfile.cpu -t benchmark-harness:cpu .
+#   docker run -v $(pwd)/data:/app/data -v $(pwd)/results:/app/results benchmark-harness:cpu
+
+FROM python:3.11-slim-bookworm AS base
+
+# Prevent Python from writing pyc files and buffering stdout/stderr
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (fast Python package installer)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# ---------------------------------------------------------------------------
+# Builder stage: install dependencies
+# ---------------------------------------------------------------------------
+FROM base AS builder
+
+# Copy dependency files first for better layer caching
+# README.md is required by pyproject.toml's readme field
+COPY pyproject.toml uv.lock README.md ./
+
+# Create virtual environment and install dependencies
+RUN uv venv /app/.venv && \
+    . /app/.venv/bin/activate && \
+    uv sync --frozen --no-dev
+
+# ---------------------------------------------------------------------------
+# Runtime stage: slim image with only necessary files
+# ---------------------------------------------------------------------------
+FROM base AS runtime
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy application code
+COPY src/ ./src/
+COPY config/ ./config/
+COPY main.py ./
+
+# Ensure the virtual environment is used
+ENV PATH="/app/.venv/bin:$PATH" \
+    VIRTUAL_ENV="/app/.venv"
+
+# Create directories for data and results (will be mounted as volumes)
+RUN mkdir -p /app/data /app/results
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import src; print('OK')" || exit 1
+
+# Default entrypoint runs the benchmark CLI
+ENTRYPOINT ["python", "-m", "src.cli.main"]
+
+# Default command shows help
+CMD ["--help"]

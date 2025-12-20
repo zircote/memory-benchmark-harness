@@ -1,0 +1,97 @@
+# Memory Benchmark Harness - GPU Image
+# Image with CUDA support for running embedding models locally
+#
+# Requirements:
+#   - NVIDIA GPU with CUDA support
+#   - nvidia-container-toolkit installed on host
+#
+# Usage:
+#   docker build -f docker/Dockerfile.gpu -t benchmark-harness:gpu .
+#   docker run --gpus all -v $(pwd)/data:/app/data -v $(pwd)/results:/app/results benchmark-harness:gpu
+#
+# Minimum GPU Requirements:
+#   - Small embeddings (MiniLM): 44MB VRAM
+#   - Medium embeddings (BGE-base): 440MB VRAM
+#   - Large embeddings (BGE-large): 2.5GB VRAM
+
+FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04 AS base
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install Python and system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
+    python3-pip \
+    git \
+    curl \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 \
+    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (fast Python package installer)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /app
+
+# ---------------------------------------------------------------------------
+# Builder stage: install dependencies including GPU-specific packages
+# ---------------------------------------------------------------------------
+FROM base AS builder
+
+# Copy dependency files first for better layer caching
+# README.md is required by pyproject.toml's readme field
+COPY pyproject.toml uv.lock README.md ./
+
+# Create virtual environment and install dependencies
+# Note: PyTorch with CUDA support is large (~2GB) - this layer will be slow
+RUN uv venv /app/.venv && \
+    . /app/.venv/bin/activate && \
+    uv sync --frozen --no-dev && \
+    # Install PyTorch with CUDA support for local embeddings
+    uv pip install torch --index-url https://download.pytorch.org/whl/cu121 && \
+    uv pip install sentence-transformers transformers
+
+# ---------------------------------------------------------------------------
+# Runtime stage: slim image with only necessary files
+# ---------------------------------------------------------------------------
+FROM base AS runtime
+
+# Copy virtual environment from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy application code
+COPY src/ ./src/
+COPY config/ ./config/
+COPY main.py ./
+
+# Ensure the virtual environment is used
+ENV PATH="/app/.venv/bin:$PATH" \
+    VIRTUAL_ENV="/app/.venv"
+
+# CUDA environment variables
+ENV NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# Create directories for data and results (will be mounted as volumes)
+RUN mkdir -p /app/data /app/results
+
+# Cache directory for HuggingFace models
+ENV HF_HOME=/app/.cache/huggingface
+RUN mkdir -p /app/.cache/huggingface
+
+# Health check (verify Python and CUDA availability)
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
+    CMD python -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'; print('OK')" || exit 1
+
+# Default entrypoint runs the benchmark CLI
+ENTRYPOINT ["python", "-m", "src.cli.main"]
+
+# Default command shows help
+CMD ["--help"]

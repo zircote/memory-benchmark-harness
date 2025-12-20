@@ -1,0 +1,64 @@
+# Memory Benchmark Harness - Docker Ignore File
+# Excludes files from Docker build context to speed up builds
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+env
+*.egg-info
+.eggs
+dist
+build
+*.egg
+
+# Testing and coverage
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+.ruff_cache
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Local development
+.env
+.env.local
+*.local
+
+# Results and data (mounted as volumes)
+results/
+data/raw/
+data/processed/
+
+# Cache directories
+.cache
+*.cache
+
+# Docker
+docker-compose.override.yml
+
+# Claude/Architecture
+.claude/
+.memory/
+.prompt-log*
+.cs-*

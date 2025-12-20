@@ -1,5 +1,0 @@
-{
-  "command": "claude-spec:plan",
-  "session_id": "3b629e1f-8a25-4481-849a-246900326a5e",
-  "prompt": "/claude-spec:plan review file prepare plan action @agent-architect-reviewer <file> @../docs/BenchmarkHarnessSpecificationforGi.md - IMPORTANT: Create a DRAFT PR as the first action before any coding"
-}
