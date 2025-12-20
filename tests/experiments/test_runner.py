@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -280,7 +280,9 @@ class TestExperimentRunner:
         runner = ExperimentRunner(config)
 
         mock_adapter = MagicMock()
-        factory = lambda: mock_adapter
+
+        def factory() -> MagicMock:
+            return mock_adapter
 
         runner.register_adapter_factory(AdapterCondition.GIT_NOTES, factory)
 
@@ -325,14 +327,14 @@ class TestExperimentRunner:
             runner._create_adapter(AdapterCondition.GIT_NOTES)
 
 
-class TestExperimentRunnerAsync:
-    """Async tests for ExperimentRunner."""
+class TestExperimentRunnerSync:
+    """Synchronous tests for ExperimentRunner."""
 
     @pytest.fixture
     def mock_llm_client(self) -> MagicMock:
         """Create a mock LLM client."""
         client = MagicMock()
-        client.generate = AsyncMock(
+        client.generate = MagicMock(
             return_value=MagicMock(
                 text="The answer is correct.",
                 confidence=0.9,
@@ -340,8 +342,41 @@ class TestExperimentRunnerAsync:
         )
         return client
 
-    @pytest.mark.asyncio
-    async def test_run_trial_success(self) -> None:
+    @pytest.fixture
+    def mock_locomo_assessment(self) -> MagicMock:
+        """Create a mock LoCoMo assessment result."""
+        assessment = MagicMock()
+        assessment.accuracy = 0.85
+        assessment.mean_score = 0.82
+        assessment.adversarial_accuracy = 0.80
+        assessment.correct_count = 85
+        assessment.partial_count = 5
+        assessment.total_questions = 100
+        assessment.accuracy_by_category = MagicMock(return_value={"SINGLE_HOP": 0.9})
+        assessment.scores_by_category = MagicMock(return_value={"SINGLE_HOP": 0.88})
+        assessment.ingestion_time_ms = 100.0
+        assessment.assessment_time_ms = 5000.0
+        assessment.conversation_metrics = {}
+        return assessment
+
+    @pytest.fixture
+    def mock_longmemeval_assessment(self) -> MagicMock:
+        """Create a mock LongMemEval assessment result."""
+        assessment = MagicMock()
+        assessment.accuracy = 0.75
+        assessment.mean_score = 0.72
+        assessment.abstention_accuracy = 0.90
+        assessment.correct_count = 15
+        assessment.partial_count = 2
+        assessment.total_questions = 20
+        assessment.dataset_subset = "S"
+        assessment.ingestion_time_ms = 50.0
+        assessment.assessment_time_ms = 2000.0
+        assessment.scores_by_type = MagicMock(return_value={"single-session-user": 0.8})
+        assessment.question_results = []
+        return assessment
+
+    def test_run_trial_success(self, mock_locomo_assessment: MagicMock) -> None:
         """Single trial runs successfully with mock adapter."""
         config = ExperimentConfig(
             benchmark="locomo",
@@ -350,28 +385,19 @@ class TestExperimentRunnerAsync:
         )
         runner = ExperimentRunner(config)
 
-        # Mock the pipeline creation to avoid full benchmark execution
-        mock_assessment = MagicMock()
-        mock_assessment.overall_accuracy = 0.85
-        mock_assessment.adversarial_accuracy = 0.80
-        mock_assessment.category_metrics = {}
-        mock_assessment.conversation_count = 10
-        mock_assessment.question_count = 50
-        mock_assessment.conversation_results = []
-
         mock_pipeline = MagicMock()
-        mock_pipeline.run_assessment = AsyncMock(return_value=mock_assessment)
-
+        mock_pipeline.run = MagicMock(return_value=mock_locomo_assessment)
         runner._create_benchmark_pipeline = MagicMock(return_value=mock_pipeline)
 
-        result = await runner._run_trial(AdapterCondition.MOCK, 0, 42)
+        mock_dataset = MagicMock()
+
+        result = runner._run_trial(AdapterCondition.MOCK, 0, 42, mock_dataset)
 
         assert result.success is True
-        assert result.metrics["overall_accuracy"] == 0.85
+        assert result.metrics["accuracy"] == 0.85
         assert result.adapter == AdapterCondition.MOCK
 
-    @pytest.mark.asyncio
-    async def test_run_trial_captures_error(self) -> None:
+    def test_run_trial_captures_error(self) -> None:
         """Trial captures error when pipeline fails."""
         config = ExperimentConfig(
             benchmark="locomo",
@@ -381,17 +407,17 @@ class TestExperimentRunnerAsync:
         runner = ExperimentRunner(config)
 
         mock_pipeline = MagicMock()
-        mock_pipeline.run_assessment = AsyncMock(side_effect=RuntimeError("Pipeline crashed"))
-
+        mock_pipeline.run = MagicMock(side_effect=RuntimeError("Pipeline crashed"))
         runner._create_benchmark_pipeline = MagicMock(return_value=mock_pipeline)
 
-        result = await runner._run_trial(AdapterCondition.MOCK, 0, 42)
+        mock_dataset = MagicMock()
+
+        result = runner._run_trial(AdapterCondition.MOCK, 0, 42, mock_dataset)
 
         assert result.success is False
         assert "Pipeline crashed" in result.error
 
-    @pytest.mark.asyncio
-    async def test_run_executes_all_trials(self) -> None:
+    def test_run_executes_all_trials(self, mock_locomo_assessment: MagicMock) -> None:
         """Run executes all trials for all conditions."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ExperimentConfig(
@@ -402,28 +428,19 @@ class TestExperimentRunnerAsync:
             )
             runner = ExperimentRunner(config)
 
-            # Mock pipeline
-            mock_assessment = MagicMock()
-            mock_assessment.overall_accuracy = 0.85
-            mock_assessment.adversarial_accuracy = 0.80
-            mock_assessment.category_metrics = {}
-            mock_assessment.conversation_count = 10
-            mock_assessment.question_count = 50
-            mock_assessment.conversation_results = []
-
             mock_pipeline = MagicMock()
-            mock_pipeline.run_assessment = AsyncMock(return_value=mock_assessment)
+            mock_pipeline.run = MagicMock(return_value=mock_locomo_assessment)
             runner._create_benchmark_pipeline = MagicMock(return_value=mock_pipeline)
+            runner._load_dataset = MagicMock(return_value=(MagicMock(), "locomo"))
 
-            results = await runner.run()
+            results = runner.run()
 
             # 2 conditions x 2 trials = 4 total
             assert results.total_trials == 4
             assert len(results.trials["mock"]) == 2
             assert len(results.trials["no-memory"]) == 2
 
-    @pytest.mark.asyncio
-    async def test_run_calls_progress_callback(self) -> None:
+    def test_run_calls_progress_callback(self, mock_locomo_assessment: MagicMock) -> None:
         """Run calls progress callback for each trial."""
         progress_calls: list[tuple[str, int, int]] = []
 
@@ -440,19 +457,12 @@ class TestExperimentRunnerAsync:
             )
             runner = ExperimentRunner(config)
 
-            mock_assessment = MagicMock()
-            mock_assessment.overall_accuracy = 0.85
-            mock_assessment.adversarial_accuracy = 0.80
-            mock_assessment.category_metrics = {}
-            mock_assessment.conversation_count = 10
-            mock_assessment.question_count = 50
-            mock_assessment.conversation_results = []
-
             mock_pipeline = MagicMock()
-            mock_pipeline.run_assessment = AsyncMock(return_value=mock_assessment)
+            mock_pipeline.run = MagicMock(return_value=mock_locomo_assessment)
             runner._create_benchmark_pipeline = MagicMock(return_value=mock_pipeline)
+            runner._load_dataset = MagicMock(return_value=(MagicMock(), "locomo"))
 
-            await runner.run()
+            runner.run()
 
             assert len(progress_calls) == 3
             # Check progress increments
@@ -460,8 +470,7 @@ class TestExperimentRunnerAsync:
             assert progress_calls[1][1] == 1  # Second call: 1 completed
             assert progress_calls[2][1] == 2  # Third call: 2 completed
 
-    @pytest.mark.asyncio
-    async def test_run_saves_results(self) -> None:
+    def test_run_saves_results(self, mock_locomo_assessment: MagicMock) -> None:
         """Run saves results to output directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ExperimentConfig(
@@ -472,19 +481,12 @@ class TestExperimentRunnerAsync:
             )
             runner = ExperimentRunner(config)
 
-            mock_assessment = MagicMock()
-            mock_assessment.overall_accuracy = 0.85
-            mock_assessment.adversarial_accuracy = 0.80
-            mock_assessment.category_metrics = {}
-            mock_assessment.conversation_count = 10
-            mock_assessment.question_count = 50
-            mock_assessment.conversation_results = []
-
             mock_pipeline = MagicMock()
-            mock_pipeline.run_assessment = AsyncMock(return_value=mock_assessment)
+            mock_pipeline.run = MagicMock(return_value=mock_locomo_assessment)
             runner._create_benchmark_pipeline = MagicMock(return_value=mock_pipeline)
+            runner._load_dataset = MagicMock(return_value=(MagicMock(), "locomo"))
 
-            results = await runner.run()
+            results = runner.run()
 
             # Check file was created
             output_path = Path(tmpdir) / f"{results.experiment_id}.json"
@@ -500,8 +502,7 @@ class TestExperimentRunnerAsync:
 class TestLongMemEvalExperiment:
     """Tests specific to LongMemEval benchmark experiments."""
 
-    @pytest.mark.asyncio
-    async def test_longmemeval_metrics_extraction(self) -> None:
+    def test_longmemeval_metrics_extraction(self) -> None:
         """LongMemEval assessment metrics are correctly extracted."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ExperimentConfig(
@@ -515,20 +516,27 @@ class TestLongMemEvalExperiment:
             # Mock LongMemEval assessment result
             mock_assessment = MagicMock()
             mock_assessment.accuracy = 0.75
-            mock_assessment.abstention_rate = 0.10
-            mock_assessment.answered_correctly = 15
+            mock_assessment.mean_score = 0.72
+            mock_assessment.abstention_accuracy = 0.90
+            mock_assessment.correct_count = 15
+            mock_assessment.partial_count = 2
             mock_assessment.total_questions = 20
-            mock_assessment.session_count = 5
+            mock_assessment.dataset_subset = "S"
+            mock_assessment.ingestion_time_ms = 50.0
+            mock_assessment.assessment_time_ms = 2000.0
+            mock_assessment.scores_by_type = MagicMock(return_value={"single-session-user": 0.8})
             mock_assessment.question_results = []
 
             mock_pipeline = MagicMock()
-            mock_pipeline.run_assessment = AsyncMock(return_value=mock_assessment)
+            mock_pipeline.run = MagicMock(return_value=mock_assessment)
             runner._create_benchmark_pipeline = MagicMock(return_value=mock_pipeline)
 
-            result = await runner._run_trial(AdapterCondition.MOCK, 0, 42)
+            mock_dataset = MagicMock()
+
+            result = runner._run_trial(AdapterCondition.MOCK, 0, 42, mock_dataset)
 
             assert result.success is True
             assert result.metrics["accuracy"] == 0.75
-            assert result.metrics["abstention_rate"] == 0.10
-            assert result.metrics["answered_correctly"] == 15
+            assert result.metrics["mean_score"] == 0.72
+            assert result.metrics["abstention_accuracy"] == 0.90
             assert result.metrics["total_questions"] == 20

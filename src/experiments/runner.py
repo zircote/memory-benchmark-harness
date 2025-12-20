@@ -19,9 +19,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from src.adapters.base import MemorySystemAdapter
+
+if TYPE_CHECKING:
+    from src.evaluation.judge import LLMJudge
 
 
 class AdapterCondition(Enum):
@@ -36,9 +39,10 @@ class BenchmarkProtocol(Protocol):
     """Protocol for benchmark pipelines.
 
     Both LongMemEval and LoCoMo pipelines implement this interface.
+    This protocol is relaxed since actual implementations have more specific signatures.
     """
 
-    async def run_assessment(self) -> Any:
+    def run(self, dataset: Any, *args: Any, **kwargs: Any) -> Any:
         """Run the full benchmark assessment."""
         ...
 
@@ -224,6 +228,8 @@ class ExperimentRunner:
         """
         self.config = config
         self._adapter_factories: dict[AdapterCondition, Callable[[], MemorySystemAdapter]] = {}
+        self._judge: LLMJudge | None = None
+        self._dataset: Any = None  # Cached dataset to avoid reloading
 
     def register_adapter_factory(
         self,
@@ -266,66 +272,89 @@ class ExperimentRunner:
                 )
         return self._adapter_factories[condition]()
 
+    def _get_or_create_judge(self) -> LLMJudge:
+        """Get existing judge or create a new one."""
+        if self._judge is None:
+            from src.evaluation.judge import LLMJudge
+
+            self._judge = LLMJudge()  # Uses OPENAI_API_KEY from env
+        return self._judge
+
+    def _load_dataset(self) -> tuple[Any, str]:
+        """Load the benchmark dataset.
+
+        Returns:
+            Tuple of (dataset, benchmark_type)
+        """
+        if self.config.benchmark == "longmemeval":
+            from src.benchmarks.longmemeval import load_longmemeval, load_longmemeval_from_file
+
+            if self.config.dataset_path:
+                return load_longmemeval_from_file(self.config.dataset_path), "longmemeval"
+            return load_longmemeval(), "longmemeval"
+
+        elif self.config.benchmark == "locomo":
+            from src.benchmarks.locomo import load_locomo, load_locomo_from_file
+
+            if self.config.dataset_path:
+                return load_locomo_from_file(self.config.dataset_path), "locomo"
+            return load_locomo(), "locomo"
+
+        else:
+            raise ValueError(f"Unknown benchmark: {self.config.benchmark}")
+
     def _create_benchmark_pipeline(
         self,
         adapter: MemorySystemAdapter,
-        seed: int,
     ) -> BenchmarkProtocol:
         """Create a benchmark pipeline for the given adapter.
 
         Args:
             adapter: Memory adapter to use
-            seed: Random seed for the trial
 
         Returns:
             Benchmark pipeline instance
+
+        Raises:
+            ValueError: If llm_client is not configured
         """
-        if self.config.benchmark == "longmemeval":
-            from src.benchmarks.longmemeval import (
-                BenchmarkPipeline,
-                load_longmemeval,
-                load_longmemeval_from_file,
+        if self.config.llm_client is None:
+            raise ValueError(
+                "llm_client is required for running experiments. "
+                "Pass an LLM client to ExperimentConfig."
             )
 
-            # Load dataset
-            if self.config.dataset_path:
-                dataset = load_longmemeval_from_file(self.config.dataset_path)
-            else:
-                dataset = load_longmemeval()
+        judge = self._get_or_create_judge()
 
-            # Create pipeline
+        if self.config.benchmark == "longmemeval":
+            from src.benchmarks.longmemeval import BenchmarkPipeline
+
+            # Create pipeline with correct positional args: (adapter, llm_client, judge)
             return BenchmarkPipeline(
-                dataset=dataset,
-                adapter=adapter,
-                llm_client=self.config.llm_client,
-                seed=seed,
+                adapter,
+                self.config.llm_client,
+                judge,
             )
 
         elif self.config.benchmark == "locomo":
-            from src.benchmarks.locomo import LoCoMoPipeline, load_locomo, load_locomo_from_file
+            from src.benchmarks.locomo import LoCoMoPipeline
 
-            # Load dataset
-            if self.config.dataset_path:
-                dataset = load_locomo_from_file(self.config.dataset_path)
-            else:
-                dataset = load_locomo()
-
-            # Create pipeline
+            # Create pipeline with correct positional args: (adapter, llm_client, judge)
             return LoCoMoPipeline(
-                dataset=dataset,
-                adapter=adapter,
-                llm_client=self.config.llm_client,
-                seed=seed,
+                adapter,
+                self.config.llm_client,
+                judge,
             )
 
         else:
             raise ValueError(f"Unknown benchmark: {self.config.benchmark}")
 
-    async def _run_trial(
+    def _run_trial(
         self,
         condition: AdapterCondition,
         trial_num: int,
         seed: int,
+        dataset: Any,
     ) -> TrialResult:
         """Run a single trial.
 
@@ -333,6 +362,7 @@ class ExperimentRunner:
             condition: Memory adapter condition
             trial_num: Trial number (0-indexed)
             seed: Random seed for this trial
+            dataset: The benchmark dataset to use
 
         Returns:
             TrialResult with metrics and raw results
@@ -343,50 +373,66 @@ class ExperimentRunner:
         start_time = time.monotonic()
 
         try:
+            # Set random seed for reproducibility
+            random.seed(seed)
+
             # Create fresh adapter and pipeline for this trial
             adapter = self._create_adapter(condition)
-            pipeline = self._create_benchmark_pipeline(adapter, seed)
+            pipeline = self._create_benchmark_pipeline(adapter)
 
-            # Run the assessment
-            assessment = await pipeline.run_assessment()
+            # Run the assessment (synchronous)
+            assessment = pipeline.run(dataset)
 
             # Extract metrics based on benchmark type
             if self.config.benchmark == "longmemeval":
                 metrics = {
                     "accuracy": assessment.accuracy,
-                    "abstention_rate": assessment.abstention_rate,
-                    "answered_correctly": assessment.answered_correctly,
+                    "mean_score": assessment.mean_score,
+                    "abstention_accuracy": assessment.abstention_accuracy,
+                    "correct_count": assessment.correct_count,
+                    "partial_count": assessment.partial_count,
                     "total_questions": assessment.total_questions,
                 }
                 raw_results = {
-                    "session_count": assessment.session_count,
+                    "dataset_subset": assessment.dataset_subset,
+                    "ingestion_time_ms": assessment.ingestion_time_ms,
+                    "assessment_time_ms": assessment.assessment_time_ms,
+                    "scores_by_type": assessment.scores_by_type(),
                     "question_results": [
                         {
                             "question_id": r.question_id,
-                            "correct": r.correct,
-                            "abstained": r.abstained,
-                            "predicted": r.predicted_answer,
+                            "is_correct": r.is_correct,
+                            "is_partial": r.is_partial,
+                            "score": r.score,
+                            "is_abstention_actual": r.is_abstention_actual,
+                            "is_abstention_expected": r.is_abstention_expected,
+                            "agent_answer": r.agent_answer[:200],  # Truncate for storage
                         }
                         for r in assessment.question_results
                     ],
                 }
             elif self.config.benchmark == "locomo":
                 metrics = {
-                    "overall_accuracy": assessment.overall_accuracy,
+                    "accuracy": assessment.accuracy,
+                    "mean_score": assessment.mean_score,
                     "adversarial_accuracy": assessment.adversarial_accuracy,
-                    "category_accuracies": {
-                        cat.name: m.accuracy for cat, m in assessment.category_metrics.items()
-                    },
+                    "correct_count": assessment.correct_count,
+                    "partial_count": assessment.partial_count,
+                    "total_questions": assessment.total_questions,
+                    "category_accuracies": assessment.accuracy_by_category(),
                 }
                 raw_results = {
-                    "conversation_count": assessment.conversation_count,
-                    "question_count": assessment.question_count,
+                    "ingestion_time_ms": assessment.ingestion_time_ms,
+                    "assessment_time_ms": assessment.assessment_time_ms,
+                    "scores_by_category": assessment.scores_by_category(),
+                    "conversation_count": len(assessment.conversation_metrics),
                     "conversation_results": [
                         {
-                            "sample_id": cr.sample_id,
-                            "accuracy": cr.accuracy,
+                            "conversation_id": conv_id,
+                            "accuracy": m.accuracy,
+                            "questions_assessed": m.questions_assessed,
                         }
-                        for cr in assessment.conversation_results
+                        for conv_id, m in assessment.conversation_metrics.items()
                     ],
                 }
             else:
@@ -418,7 +464,7 @@ class ExperimentRunner:
                 error=str(e),
             )
 
-    async def run(self) -> ExperimentResults:
+    def run(self) -> ExperimentResults:
         """Run the complete experiment.
 
         Executes all trials across all adapter conditions with reproducible
@@ -442,6 +488,9 @@ class ExperimentRunner:
             started_at=datetime.now(UTC).isoformat(),
         )
 
+        # Load dataset once for all trials
+        dataset, _ = self._load_dataset()
+
         seeds = self.config.get_seeds()
         total_trials = len(self.config.adapters) * self.config.num_trials
         completed = 0
@@ -458,7 +507,7 @@ class ExperimentRunner:
                         total_trials,
                     )
 
-                trial_result = await self._run_trial(condition, trial_num, seed)
+                trial_result = self._run_trial(condition, trial_num, seed, dataset)
                 results.trials[condition.value].append(trial_result)
                 completed += 1
 
@@ -471,7 +520,7 @@ class ExperimentRunner:
         return results
 
 
-async def run_experiment(
+def run_experiment(
     benchmark: str,
     conditions: list[str] | None = None,
     num_trials: int = 5,
@@ -487,7 +536,7 @@ async def run_experiment(
         num_trials: Number of trials per condition
         output_dir: Directory to save results
         dataset_path: Optional path to dataset
-        llm_client: LLM client for judging
+        llm_client: LLM client for answer generation
 
     Returns:
         ExperimentResults containing all trial outcomes
@@ -507,4 +556,4 @@ async def run_experiment(
     )
 
     runner = ExperimentRunner(config)
-    return await runner.run()
+    return runner.run()
