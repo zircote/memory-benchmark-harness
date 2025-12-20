@@ -181,7 +181,8 @@ last_updated: 2025-12-20T01:45:00Z
 
 | Date | Task | Original | Actual | Reason |
 |------|------|----------|--------|--------|
-| - | - | - | - | - |
+| 2025-12-20 | 1.3.5 | Run LongMemEval experiments | Blocked | HuggingFace dataset `xiaowu0162/longmemeval-cleaned` has pyarrow JSON schema incompatibilities (answer column type mismatch). Need dataset owner fix or alternative data source. |
+| 2025-12-20 | R3 | Verify HF dataset availability | Failed | LongMemEval dataset loading fails with pyarrow error. LoCoMo has local data (data/locomo/locomo10.json). |
 
 ---
 
@@ -211,3 +212,4 @@ last_updated: 2025-12-20T01:45:00Z
 | 2025-12-20 | Phase 3.2 | 3 | Tasks 3.2.1-3.2.3: Human validation infrastructure - annotation.py (200 lines) with RubricLevel enum, AnnotationRubric/AnnotationGuidelines dataclasses, create_default_guidelines() factory; compiler.py (350 lines) with SampleCompiler for multi-benchmark aggregation, SourceBenchmark enum, stratified sampling, JSON/CSV export; collector.py (350 lines) with ValidationCollector, AnnotationSession management, session persistence; analysis.py (350 lines) with ValidationAnalyzer, Cohen's Kappa/weighted Kappa, confusion matrix, ValidationReport generation; 89 validation tests passing; 782 total tests (78% coverage) |
 | 2025-12-20 | Phase 3.3 | 3 | Tasks 3.3.1-3.3.3 infrastructure: Publication module (src/publication/) - statistics.py (450 lines) with UnifiedMetrics/BenchmarkSummary/AblationResult/PublicationStatistics dataclasses, aggregate computation, adapter comparison; tables.py (524 lines) with MainResultsTable/AblationTable/CategoryBreakdownTable/HumanValidationTable generators for LaTeX and Markdown; figures.py (481 lines) with PerformanceBarChart/AblationHeatmap/CategoryRadarPlot/ConfidenceIntervalPlot/HumanAgreementPlot using optional matplotlib; 35 publication tests (11 skip without matplotlib); 817 total tests (77% coverage) |
 | 2025-12-20 | Phase 3.4 | 4 | Tasks 3.4.1-3.4.4: Publication drafts - paper.tex (LaTeX arXiv paper with abstract, 7 sections, 3 appendices, booktabs tables, placeholder results); blog_post.md (accessible overview with code examples, key findings placeholders); REPRODUCIBILITY.md (full reproducibility package with hardware/software requirements, step-by-step instructions, time/cost estimates, configuration templates) |
+| 2025-12-20 | Validation & Docs | 2 | OpenAI API validation successful (3/3 tests passed via scripts/minimal_validation.py); Comprehensive experiment documentation (docs/experiments/) with 8 README files covering validation, LongMemEval, LoCoMo, Context-Bench, MemoryAgentBench, Terminal-Bench, and ablations; LLMJudge uses JudgmentResult enum (CORRECT/INCORRECT/PARTIAL/ERROR) with score 0.0-1.0; Fixed mypy type annotations; Commits 28641bc pushed to PR |

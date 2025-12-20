@@ -281,7 +281,7 @@ def load_longmemeval(
 
     # Load the dataset
     dataset_name = "xiaowu0162/longmemeval-cleaned"
-    kwargs: dict[str, Any] = {"trust_remote_code": True}
+    kwargs: dict[str, Any] = {}
     if cache_dir:
         kwargs["cache_dir"] = str(cache_dir)
 

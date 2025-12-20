@@ -415,7 +415,7 @@ def load_memoryagentbench(
     )
 
     dataset_name = "ai-hyz/MemoryAgentBench"
-    kwargs: dict[str, Any] = {"trust_remote_code": True}
+    kwargs: dict[str, Any] = {}
     if cache_dir:
         kwargs["cache_dir"] = str(cache_dir)
 
