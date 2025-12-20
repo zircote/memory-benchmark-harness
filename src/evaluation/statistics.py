@@ -397,7 +397,7 @@ class StatisticalAnalyzer:
             idx_previous = sorted_indices[i - 1]
             corrected[idx_current] = max(corrected[idx_current], corrected[idx_previous])
 
-        return corrected.tolist()
+        return [float(x) for x in corrected]
 
     def correct_comparisons(
         self,
