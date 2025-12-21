@@ -185,7 +185,7 @@ class PublicationStatistics:
         ci_data = data.get("accuracy_ci", data.get("confidence_interval", {}))
         if isinstance(ci_data, dict):
             ci = (ci_data.get("lower", 0.0), ci_data.get("upper", 0.0))
-        elif isinstance(ci_data, (list, tuple)) and len(ci_data) >= 2:
+        elif isinstance(ci_data, list | tuple) and len(ci_data) >= 2:
             ci = (float(ci_data[0]), float(ci_data[1]))
         else:
             ci = (0.0, 0.0)

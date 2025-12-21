@@ -118,7 +118,7 @@ class TestMemoryAugmentedInstalledAgent:
         """Test environment with custom variables."""
         agent = MemoryAugmentedInstalledAgent(
             adapter=MockAdapter(),
-            env_vars={"API_KEY": "test123"},
+            env_vars={"API_KEY": "test123"},  # pragma: allowlist secret
         )
         env = agent._env
         assert env["API_KEY"] == "test123"

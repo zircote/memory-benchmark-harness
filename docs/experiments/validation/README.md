@@ -109,7 +109,7 @@ ERROR: OPENAI_API_KEY not set
 
 **Fix**: Set the environment variable:
 ```bash
-export OPENAI_API_KEY="sk-..."
+export OPENAI_API_KEY="sk-..."  # pragma: allowlist secret
 ```
 
 ### API Connection Error

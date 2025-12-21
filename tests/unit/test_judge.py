@@ -380,7 +380,7 @@ class TestLLMJudge:
         """Create judge with mock client."""
         with patch("src.evaluation.judge.OpenAI"):
             return LLMJudge(
-                api_key="test-key",
+                api_key="test-key",  # pragma: allowlist secret
                 cache_dir=tmp_path / "cache",
             )
 

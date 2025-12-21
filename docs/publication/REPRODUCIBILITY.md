@@ -29,7 +29,7 @@ cd memory-benchmark-harness
 uv sync
 
 # Set API keys
-export OPENAI_API_KEY="your-key-here"
+export OPENAI_API_KEY="your-key-here"  # pragma: allowlist secret
 
 # Run all benchmarks
 uv run benchmark run-all --adapters git_notes,no_memory

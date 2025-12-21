@@ -32,7 +32,7 @@ uv run benchmark report --results-dir results/
 ### Environment Variables
 
 ```bash
-export OPENAI_API_KEY="your-api-key"  # Required for LLM Judge
+export OPENAI_API_KEY="your-api-key"  # pragma: allowlist secret - Required for LLM Judge
 ```
 
 ### Dependencies
