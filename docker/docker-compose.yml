@@ -47,7 +47,7 @@ services:
     - BENCHMARK_MODE=full
     networks:
     - benchmark-net
-    restart: 'no'
+    restart: no
 
   # CPU-only benchmark for CI and quick runs
   benchmark-lite:
@@ -68,7 +68,7 @@ services:
     - DISABLE_LOCAL_EMBEDDINGS=1
     networks:
     - benchmark-net
-    restart: 'no'
+    restart: no
 
   # Development environment with live reload
   dev:
