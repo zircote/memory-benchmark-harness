@@ -3,7 +3,7 @@ document_type: architecture
 project_id: SPEC-2025-12-19-001
 version: 1.0.0
 last_updated: 2025-12-19T19:00:00Z
-status: approved
+status: completed
 ---
 
 # Benchmark Harness - Technical Architecture
@@ -793,7 +793,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.9.18 /uv /usr/local/bin/
 
 # Copy project files
 COPY pyproject.toml uv.lock ./
@@ -815,7 +815,7 @@ WORKDIR /app
 
 # Install Python and uv
 RUN apt-get update && apt-get install -y python3.11 python3.11-venv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/
+COPY --from=ghcr.io/astral-sh/uv:0.9.18 /uv /usr/local/bin/
 
 # Copy and install
 COPY pyproject.toml uv.lock ./
