@@ -94,22 +94,26 @@ class NoMemoryAdapter(MemorySystemAdapter):
         return []
 
     def update(
-        self, memory_id: str, content: str, metadata: dict[str, Any] | None = None
+        self,
+        memory_id: str,
+        content: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MemoryOperationResult:
         """Update an existing memory entry.
 
         Args:
             memory_id: The ID of the memory to update
-            content: New content
+            content: New content (None means keep existing)
             metadata: Optional updated metadata
 
         Returns:
             MemoryOperationResult indicating success/failure
         """
-        for i, (mid, _, old_metadata, created_at) in enumerate(self._memories):
+        for i, (mid, old_content, old_metadata, created_at) in enumerate(self._memories):
             if mid == memory_id:
                 merged_metadata = {**old_metadata, **(metadata or {})}
-                self._memories[i] = (memory_id, content, merged_metadata, created_at)
+                new_content = content if content is not None else old_content
+                self._memories[i] = (memory_id, new_content, merged_metadata, created_at)
                 return MemoryOperationResult(
                     success=True,
                     memory_id=memory_id,

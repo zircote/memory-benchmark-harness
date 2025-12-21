@@ -141,7 +141,7 @@ class MemoryAgentBenchAgent:
 
         stored = 0
         for i, chunk in enumerate(chunks):
-            metadata = {
+            metadata: dict[str, Any] = {
                 "question_id": question.question_id,
                 "competency": question.competency.value,
                 "chunk_index": i,

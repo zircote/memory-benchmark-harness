@@ -16,6 +16,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
+
 from src.benchmarks.contextbench.dataset import QuestionCategory
 from src.benchmarks.contextbench.pipeline import EvaluationResult, QuestionResult
 from src.evaluation.statistics import (
@@ -96,11 +98,7 @@ class MetricsCalculator:
         scores = [1.0 if r.correct else 0.0 for r in results]
 
         try:
-            return self.analyzer.bootstrap_ci(
-                data=scores,
-                n_iterations=self.n_bootstrap,
-                confidence_level=self.confidence_level,
-            )
+            return self.analyzer.bootstrap_ci(np.array(scores))
         except Exception as e:
             logger.warning(f"Failed to compute CI: {e}")
             return None

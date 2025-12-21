@@ -9,7 +9,12 @@ from typing import Annotated, Any
 
 import typer
 
-from src.experiments.runner import AdapterCondition, ExperimentConfig, ExperimentRunner
+from src.experiments.runner import (
+    AdapterCondition,
+    ExperimentConfig,
+    ExperimentResults,
+    ExperimentRunner,
+)
 from src.publication import (
     AblationHeatmap,
     AblationTable,
@@ -144,7 +149,7 @@ def run(
 
     # Run experiment
     runner = ExperimentRunner(config)
-    results = asyncio.run(runner.run())
+    results: ExperimentResults = asyncio.run(runner.run())  # type: ignore[arg-type]
 
     # Report results
     typer.echo()
@@ -645,7 +650,7 @@ def report_combined(
     typer.echo(f"Found {len(result_files)} result files in {results_dir}")
 
     # Load all results
-    all_results: list[dict] = []
+    all_results: list[dict[str, Any]] = []
     for rf in result_files:
         try:
             with rf.open() as f:

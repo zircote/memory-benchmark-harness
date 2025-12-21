@@ -200,7 +200,7 @@ class StatisticalAnalyzer:
 
     def bootstrap_ci(
         self,
-        data: NDArray[np.floating[Any]],
+        data: NDArray[np.floating[Any]] | list[float],
         statistic: Callable[[NDArray[np.floating[Any]]], float] = np.mean,
     ) -> ConfidenceInterval:
         """Compute BCa (Bias-Corrected and Accelerated) bootstrap CI.
@@ -293,8 +293,8 @@ class StatisticalAnalyzer:
 
     def paired_comparison(
         self,
-        condition_a: NDArray[np.floating[Any]],
-        condition_b: NDArray[np.floating[Any]],
+        condition_a: NDArray[np.floating[Any]] | list[float],
+        condition_b: NDArray[np.floating[Any]] | list[float],
         comparison_name: str = "",
     ) -> ComparisonResult:
         """Compare two conditions with paired test.
@@ -476,3 +476,27 @@ class StatisticalAnalyzer:
             "confidence_level": self._confidence,
             "alpha": self._alpha,
         }
+
+    # Aliases for backward compatibility
+    def compare_conditions(
+        self,
+        condition_a: NDArray[np.floating[Any]] | list[float],
+        condition_b: NDArray[np.floating[Any]] | list[float],
+        condition_a_name: str = "",
+        condition_b_name: str = "",
+    ) -> ComparisonResult:
+        """Alias for paired_comparison for backward compatibility."""
+        a = np.asarray(condition_a, dtype=np.float64)
+        b = np.asarray(condition_b, dtype=np.float64)
+        # Use condition_a_name as the comparison name if provided
+        comparison_name = f"{condition_a_name} vs {condition_b_name}" if condition_a_name else ""
+        return self.paired_comparison(a, b, comparison_name)
+
+    def bootstrap_confidence_interval(
+        self,
+        data: NDArray[np.floating[Any]] | list[float],
+        statistic: Callable[[NDArray[np.floating[Any]]], float] = np.mean,
+    ) -> ConfidenceInterval:
+        """Alias for bootstrap_ci for backward compatibility."""
+        arr = np.asarray(data, dtype=np.float64)
+        return self.bootstrap_ci(arr, statistic)

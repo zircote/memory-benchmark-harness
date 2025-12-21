@@ -28,7 +28,7 @@ from src.benchmarks.memoryagentbench.dataset import (
 from src.benchmarks.memoryagentbench.wrapper import (
     MemoryAgentBenchAgent,
 )
-from src.evaluation.judge import JudgmentResult, LLMJudge
+from src.evaluation.judge import Judgment, JudgmentResult, LLMJudge
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class QuestionResult:
     question_text: str
     ground_truth: list[str]
     generated_answer: str
-    judgment: JudgmentResult | None
+    judgment: Judgment | None
     correct: bool
     competency: Competency
     difficulty: DifficultyLevel

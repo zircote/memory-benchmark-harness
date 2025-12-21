@@ -166,7 +166,7 @@ jobs:
 
       - name: Test CPU image
         run: |
-          docker run --rm benchmark-harness:cpu-latest python -c "import src.adapters; print('Import successful')"
+          docker run --rm --entrypoint python benchmark-harness:cpu-latest -c "import src.adapters; print('Import successful')"
 
   ci-success:
     name: CI Success

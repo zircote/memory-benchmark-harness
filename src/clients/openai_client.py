@@ -89,7 +89,7 @@ class OpenAIClient:
         # Call OpenAI API
         response = self.client.chat.completions.create(
             model=self.model,
-            messages=all_messages,
+            messages=all_messages,  # type: ignore[arg-type]
             temperature=temperature,
             max_tokens=self.max_tokens,
         )

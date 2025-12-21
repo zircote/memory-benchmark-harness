@@ -332,7 +332,7 @@ class ExperimentRunner:
             # Create pipeline with correct positional args: (adapter, llm_client, judge)
             return BenchmarkPipeline(
                 adapter,
-                self.config.llm_client,
+                self.config.llm_client,  # type: ignore[arg-type]
                 judge,
             )
 
@@ -342,7 +342,7 @@ class ExperimentRunner:
             # Create pipeline with correct positional args: (adapter, llm_client, judge)
             return LoCoMoPipeline(
                 adapter,
-                self.config.llm_client,
+                self.config.llm_client,  # type: ignore[arg-type]
                 judge,
             )
 

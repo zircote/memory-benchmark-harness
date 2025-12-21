@@ -9,7 +9,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,8 @@ try:
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
-    plt = None  # type: ignore
-    np = None  # type: ignore
+    plt = None  # type: ignore[assignment, unused-ignore]
+    np = None  # type: ignore[assignment, unused-ignore]
 
 
 @dataclass

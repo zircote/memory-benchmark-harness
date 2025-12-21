@@ -7,6 +7,7 @@ including inter-annotator agreement and comparison with LLM judgments.
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -144,7 +145,7 @@ class ValidationAnalyzer:
 
     def _compute_agreement(
         self,
-        pairs: list[tuple[RubricLevel | str, RubricLevel | str]],
+        pairs: Sequence[tuple[RubricLevel | str, RubricLevel | str]],
     ) -> AgreementMetrics:
         """Compute agreement metrics from judgment pairs.
 

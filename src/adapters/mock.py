@@ -294,13 +294,16 @@ class MockAdapter(MemorySystemAdapter):
         return results[:limit]
 
     def update(
-        self, memory_id: str, content: str, metadata: dict[str, Any] | None = None
+        self,
+        memory_id: str,
+        content: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MemoryOperationResult:
         """Update an existing memory entry.
 
         Args:
             memory_id: The ID of the memory to update
-            content: New content
+            content: New content (None means keep existing)
             metadata: Optional updated metadata (merges with existing)
 
         Returns:
@@ -327,10 +330,11 @@ class MockAdapter(MemorySystemAdapter):
                 error=f"Memory not found: {memory_id}",
             )
 
-        _, old_metadata, created_at, _ = self._memories[memory_id]
+        old_content, old_metadata, created_at, _ = self._memories[memory_id]
         merged_metadata = {**old_metadata, **(metadata or {})}
+        new_content = content if content is not None else old_content
         now = datetime.now(UTC)
-        self._memories[memory_id] = (content, merged_metadata, created_at, now)
+        self._memories[memory_id] = (new_content, merged_metadata, created_at, now)
 
         return MemoryOperationResult(
             success=True,

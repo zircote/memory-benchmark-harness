@@ -415,7 +415,7 @@ class PublicationStatistics:
                 category_accuracies[category][s.adapter_name].append(metrics.accuracy)
 
         for category, by_adapter in sorted(category_accuracies.items()):
-            row = {"category": category}
+            row: dict[str, str | float] = {"category": category}
             for adapter, scores in sorted(by_adapter.items()):
                 row[adapter] = sum(scores) / len(scores) if scores else 0.0
             results.append(row)

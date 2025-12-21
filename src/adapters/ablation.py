@@ -555,4 +555,5 @@ def create_ablation_adapter(
         )
 
     adapter_class = ablation_map[ablation_type]
-    return adapter_class(base_adapter=base_adapter, **kwargs)
+    result: MemorySystemAdapter = adapter_class(base_adapter=base_adapter, **kwargs)
+    return result

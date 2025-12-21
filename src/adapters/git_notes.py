@@ -17,13 +17,16 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from src.adapters.base import MemoryItem, MemoryOperationResult, MemorySystemAdapter
 
-if TYPE_CHECKING:
-    from git_notes_memory import CaptureService, RecallService, SyncService
-    from git_notes_memory.index import IndexService
+# Type aliases for git-notes-memory-manager services
+# These are dynamically imported at runtime, so we use Any for type hints
+CaptureService = Any
+RecallService = Any
+SyncService = Any
+IndexService = Any
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +181,7 @@ class GitNotesAdapter(MemorySystemAdapter):
             )
 
             # SyncService accepts repo_path for initialization
-            self._sync_service = get_sync_service(repo_path=self._repo_path)
+            self._sync_service = get_sync_service(repo_path=self._repo_path)  # type: ignore[operator]
 
             self._initialized = True
             logger.info(
@@ -328,7 +331,10 @@ class GitNotesAdapter(MemorySystemAdapter):
             return []
 
     def update(
-        self, memory_id: str, content: str, metadata: dict[str, Any] | None = None
+        self,
+        memory_id: str,
+        content: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MemoryOperationResult:
         """Update an existing memory entry.
 
@@ -337,7 +343,7 @@ class GitNotesAdapter(MemorySystemAdapter):
 
         Args:
             memory_id: The ID of the memory to update
-            content: New content
+            content: New content (None means keep existing)
             metadata: Optional updated metadata
 
         Returns:
@@ -358,14 +364,17 @@ class GitNotesAdapter(MemorySystemAdapter):
                     error=f"Memory not found: {memory_id}",
                 )
 
+            # Use new content or keep original
+            new_content = content if content is not None else original.content
+
             # Create new memory with updated content
             namespace = (metadata.get("namespace") if metadata else None) or original.namespace
-            summary = _extract_summary_from_content(content)
+            summary = _extract_summary_from_content(new_content)
 
             result = self._capture_service.capture(
                 namespace=namespace,
                 summary=summary,
-                content=content,
+                content=new_content,
                 spec=metadata.get("spec") if metadata else original.spec,
                 tags=metadata.get("tags") if metadata else list(original.tags),
                 relates_to=[memory_id],  # Link to original

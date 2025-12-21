@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+
 from src.evaluation.statistics import (
     ComparisonResult,
     ConfidenceInterval,
@@ -155,11 +157,7 @@ class ResultsReporter:
         accuracy_ci = None
         if len(accuracies) >= 2:
             try:
-                accuracy_ci = self.analyzer.bootstrap_ci(
-                    data=accuracies,
-                    n_iterations=self.n_bootstrap,
-                    confidence_level=self.confidence_level,
-                )
+                accuracy_ci = self.analyzer.bootstrap_ci(np.array(accuracies))
             except Exception:
                 pass  # Skip CI if computation fails
 

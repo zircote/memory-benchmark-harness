@@ -119,13 +119,16 @@ class MemorySystemAdapter(ABC):
 
     @abstractmethod
     def update(
-        self, memory_id: str, content: str, metadata: dict[str, Any] | None = None
+        self,
+        memory_id: str,
+        content: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> MemoryOperationResult:
         """Update an existing memory entry.
 
         Args:
             memory_id: The ID of the memory to update
-            content: New content
+            content: New content (None means keep existing)
             metadata: Optional updated metadata (merges with existing)
 
         Returns:

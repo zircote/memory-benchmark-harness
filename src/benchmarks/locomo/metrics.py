@@ -311,7 +311,7 @@ class LoCoMoMetricsCalculator:
         if analyzer and results.question_results:
             scores = [r.score for r in results.question_results]
             ci = analyzer.bootstrap_confidence_interval(np.array(scores), statistic=np.mean)
-            aggregate_ci = (float(ci[0]), float(ci[1]))
+            aggregate_ci = (ci.lower, ci.upper)
 
         return LoCoMoMetrics(
             total_questions=results.total_questions,
@@ -362,7 +362,7 @@ class LoCoMoMetricsCalculator:
                 ci_result = analyzer.bootstrap_confidence_interval(
                     np.array(scores), statistic=np.mean
                 )
-                ci = (float(ci_result[0]), float(ci_result[1]))
+                ci = (ci_result.lower, ci_result.upper)
 
             category_metrics[cat_name] = CategoryMetricsReport(
                 category_name=cat_name,
@@ -512,26 +512,7 @@ def compare_metrics(
     Returns:
         Dictionary with comparison results
     """
-    comparison = {
-        "labels": {"a": label_a, "b": label_b},
-        "aggregate": {
-            "accuracy_a": metrics_a.aggregate_accuracy,
-            "accuracy_b": metrics_b.aggregate_accuracy,
-            "accuracy_diff": metrics_a.aggregate_accuracy - metrics_b.aggregate_accuracy,
-            "mean_score_a": metrics_a.aggregate_mean_score,
-            "mean_score_b": metrics_b.aggregate_mean_score,
-            "mean_score_diff": (metrics_a.aggregate_mean_score - metrics_b.aggregate_mean_score),
-        },
-        "by_category": {},
-        "adversarial": {
-            "identification_rate_a": metrics_a.adversarial_metrics.identification_rate,
-            "identification_rate_b": metrics_b.adversarial_metrics.identification_rate,
-            "identification_rate_diff": (
-                metrics_a.adversarial_metrics.identification_rate
-                - metrics_b.adversarial_metrics.identification_rate
-            ),
-        },
-    }
+    by_category: dict[str, dict[str, float | None]] = {}
 
     # Compare by category
     all_categories = set(metrics_a.category_metrics.keys()) | set(metrics_b.category_metrics.keys())
@@ -545,10 +526,31 @@ def compare_metrics(
         if accuracy_a is not None and accuracy_b is not None:
             accuracy_diff = accuracy_a - accuracy_b
 
-        comparison["by_category"][cat] = {
+        by_category[cat] = {
             "accuracy_a": accuracy_a,
             "accuracy_b": accuracy_b,
             "accuracy_diff": accuracy_diff,
         }
+
+    comparison: dict[str, Any] = {
+        "labels": {"a": label_a, "b": label_b},
+        "aggregate": {
+            "accuracy_a": metrics_a.aggregate_accuracy,
+            "accuracy_b": metrics_b.aggregate_accuracy,
+            "accuracy_diff": metrics_a.aggregate_accuracy - metrics_b.aggregate_accuracy,
+            "mean_score_a": metrics_a.aggregate_mean_score,
+            "mean_score_b": metrics_b.aggregate_mean_score,
+            "mean_score_diff": (metrics_a.aggregate_mean_score - metrics_b.aggregate_mean_score),
+        },
+        "by_category": by_category,
+        "adversarial": {
+            "identification_rate_a": metrics_a.adversarial_metrics.identification_rate,
+            "identification_rate_b": metrics_b.adversarial_metrics.identification_rate,
+            "identification_rate_diff": (
+                metrics_a.adversarial_metrics.identification_rate
+                - metrics_b.adversarial_metrics.identification_rate
+            ),
+        },
+    }
 
     return comparison

@@ -10,6 +10,8 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 if TYPE_CHECKING:
     from src.evaluation.statistics import StatisticalAnalyzer
 
@@ -175,7 +177,7 @@ class TerminalBenchMetricsCalculator:
         if self.analyzer is not None and len(trial_results) >= 3:
             trial_rates = [t.success_rate for t in trial_results]
             try:
-                ci = self.analyzer.bootstrap_ci(trial_rates)
+                ci = self.analyzer.bootstrap_ci(np.array(trial_rates))
                 ci_lower = ci.lower
                 ci_upper = ci.upper
             except Exception as e:
@@ -336,7 +338,7 @@ class TerminalBenchMetricsCalculator:
                     p_value = comparison.p_value
                     effect_size = comparison.effect_size
                     is_significant = comparison.is_significant
-                    ci = (comparison.ci_lower, comparison.ci_upper)
+                    ci = (comparison.ci_difference.lower, comparison.ci_difference.upper)
                 except Exception as e:
                     logger.warning(f"Statistical comparison failed: {e}")
 
