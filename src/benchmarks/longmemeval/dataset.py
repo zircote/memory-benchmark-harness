@@ -348,6 +348,9 @@ def load_longmemeval_from_file(
     """Load the benchmark dataset from a local JSON file.
 
     This is useful for offline testing or when HuggingFace is not accessible.
+    Supports multiple formats:
+    - Oracle format: list of questions with embedded haystack_sessions
+    - Standard format: separate sessions and questions lists
 
     Args:
         filepath: Path to JSON file with dataset
@@ -367,17 +370,43 @@ def load_longmemeval_from_file(
 
     sessions: list[LongMemEvalSession] = []
     questions: list[LongMemEvalQuestion] = []
+    seen_session_ids: set[str] = set()
 
     # Handle different possible structures
     if isinstance(data, list):
-        # List of items
+        # List of items - could be oracle format or standard
         for idx, item in enumerate(data):
-            if "messages" in item or "session_id" in item:
+            # Oracle format: questions with embedded haystack_sessions
+            if "haystack_sessions" in item:
+                session_ids = item.get(
+                    "haystack_session_ids", [f"s_{idx}_{i}" for i in range(len(item["haystack_sessions"]))]
+                )
+                for sid, session_messages in zip(session_ids, item["haystack_sessions"]):
+                    if sid not in seen_session_ids:
+                        seen_session_ids.add(sid)
+                        messages = [
+                            Message(role=m["role"], content=m["content"])
+                            for m in session_messages
+                        ]
+                        sessions.append(
+                            LongMemEvalSession(
+                                session_id=sid,
+                                messages=messages,
+                                timestamp=item.get("haystack_dates", [None])[0] if item.get("haystack_dates") else None,
+                            )
+                        )
+                # Parse question with oracle-specific field mapping
+                if "question_id" not in item:
+                    item["question_id"] = f"q_{idx}"
+                questions.append(_parse_question_oracle(item))
+            # Standard format
+            elif "messages" in item or "session_id" in item:
                 sessions.append(_parse_session(item))
             if "question" in item or "query" in item:
                 if "question_id" not in item:
                     item["question_id"] = f"q_{idx}"
-                questions.append(_parse_question(item))
+                if "haystack_sessions" not in item:  # Avoid double-parsing
+                    questions.append(_parse_question(item))
     elif isinstance(data, dict):
         # Dict with sessions and questions keys
         if "sessions" in data:
@@ -396,5 +425,48 @@ def load_longmemeval_from_file(
         metadata={
             "source": str(filepath),
             "loaded_at": datetime.now().isoformat(),
+        },
+    )
+
+
+def _parse_question_oracle(raw: dict[str, Any]) -> LongMemEvalQuestion:
+    """Parse a question from oracle format with haystack_sessions."""
+    question_id = raw["question_id"]
+    is_abstention = question_id.endswith("_abs")
+
+    # Answer can be string or list
+    answer = raw.get("answer", "")
+    if isinstance(answer, str):
+        gt = [answer]
+    elif isinstance(answer, int):
+        gt = [str(answer)]
+    else:
+        gt = [str(a) for a in answer]
+
+    # Parse question type
+    qtype_str = raw.get("question_type", "multi-session")
+    try:
+        qtype = QuestionType.from_string(qtype_str)
+    except ValueError:
+        logger.warning(
+            f"Unknown question type '{qtype_str}' for {question_id}, using MULTI_SESSION"
+        )
+        qtype = QuestionType.MULTI_SESSION
+
+    # Relevant sessions from answer_session_ids
+    rel_sessions = raw.get("answer_session_ids", raw.get("haystack_session_ids", []))
+    if isinstance(rel_sessions, str):
+        rel_sessions = [rel_sessions]
+
+    return LongMemEvalQuestion(
+        question_id=question_id,
+        question_text=raw.get("question", ""),
+        ground_truth=gt,
+        question_type=qtype,
+        relevant_session_ids=rel_sessions,
+        is_abstention=is_abstention,
+        metadata={
+            "question_date": raw.get("question_date"),
+            "haystack_dates": raw.get("haystack_dates"),
         },
     )

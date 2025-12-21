@@ -196,14 +196,14 @@ class MemoryAgentBenchPipeline:
             answer_result = self.agent.answer_question(question)
 
         # Get judgment from LLM judge
+        # Note: LLMJudge only supports single reference answer; use first answer
         try:
             judgment = self.judge.judge(
                 question=question.question_text,
                 reference_answer=question.answers[0],  # Use first answer as reference
-                generated_answer=answer_result.answer,
-                additional_references=question.answers[1:] if len(question.answers) > 1 else None,
+                model_answer=answer_result.answer,
             )
-            correct = judgment.is_correct
+            correct = judgment.result == JudgmentResult.CORRECT
         except Exception as e:
             logger.error(f"Judgment failed for {question.question_id}: {e}")
             judgment = None

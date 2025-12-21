@@ -174,9 +174,9 @@ class ContextBenchPipeline:
             judgment = self.judge.judge(
                 question=question.question_text,
                 reference_answer=question.answer,
-                generated_answer=op_result.answer,
+                model_answer=op_result.answer,
             )
-            correct = judgment.is_correct
+            correct = judgment.result == JudgmentResult.CORRECT
         except Exception as e:
             logger.error(f"Judgment failed for {question.question_id}: {e}")
             judgment = None

@@ -14,6 +14,7 @@ from src.benchmarks.contextbench.dataset import (
     ContextBenchDataset,
     ContextBenchFile,
     ContextBenchQuestion,
+    generate_synthetic_dataset,
     load_contextbench,
     load_contextbench_from_file,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "ContextBenchDataset",
     "ContextBenchQuestion",
     "ContextBenchFile",
+    "generate_synthetic_dataset",
     "load_contextbench",
     "load_contextbench_from_file",
     # Wrapper
