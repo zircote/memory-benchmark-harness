@@ -145,20 +145,23 @@ endif
 
 ##@ CI Helpers
 
-quality: lint format-check typecheck test-unit ## Run all quality gates (mirrors GitHub Actions CI)
+quality: ci-lint ci-typecheck ci-test ## Run all quality gates (mirrors GitHub Actions CI exactly)
 	@echo "$(GREEN)All quality gates passed!$(NC)"
 
 ci: quality ## Alias for quality (run all CI checks locally)
 
-ci-lint: ## CI: Run linting checks
+ci-lint: ## CI: Lint + format check (exact CI parity)
+	@echo "$(BLUE)Running lint checks (CI parity)...$(NC)"
 	$(RUN) ruff check src tests scripts
 	$(RUN) ruff format --check src tests scripts
 
-ci-typecheck: ## CI: Run type checking
+ci-typecheck: ## CI: Type checking (exact CI parity)
+	@echo "$(BLUE)Running type checks (CI parity)...$(NC)"
 	$(RUN) mypy src --ignore-missing-imports
 
-ci-test: ## CI: Run tests with XML coverage output
-	$(RUN) pytest tests/unit -v --tb=short --cov=src --cov-report=xml
+ci-test: ## CI: Unit tests with coverage (exact CI parity)
+	@echo "$(BLUE)Running unit tests (CI parity)...$(NC)"
+	$(RUN) pytest tests/unit -v --tb=short --cov=src --cov-report=xml --cov-report=term-missing
 
 ##@ Docker
 
