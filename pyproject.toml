@@ -65,6 +65,26 @@ ignore = [
     "C901",   # too complex
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# Ablation adapters intentionally ignore parameters to test degraded behavior
+"src/adapters/ablation.py" = ["ARG002"]
+# No-memory adapter deliberately ignores search parameters
+"src/adapters/no_memory.py" = ["ARG002"]
+# Dataset loaders have cache_dir for API compatibility even if unused
+"src/benchmarks/*/dataset.py" = ["ARG001", "B007"]
+# Task selector has complex filtering logic
+"src/benchmarks/terminalbench/task_selector.py" = ["ARG002", "SIM102"]
+# Publication figures use matplotlib patches for availability check
+"src/publication/figures.py" = ["F401", "SIM105"]
+# Results reporter has error handling patterns
+"src/reporting/results_reporter.py" = ["SIM102", "SIM105"]
+# Validation analysis uses annotations in loops
+"src/validation/analysis.py" = ["F402"]
+# Test files often have fixtures/callbacks that don't use all args
+"tests/**/*.py" = ["ARG001", "ARG002", "E741"]
+# Quick test scripts are for validation, not production
+"scripts/quick_*.py" = ["ARG001", "ARG002", "F841"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
@@ -106,4 +126,5 @@ dev = [
     "pytest-asyncio>=1.3.0",
     "pytest-cov>=7.0.0",
     "ruff>=0.14.10",
+    "types-pyyaml>=6.0.12.20250915",
 ]

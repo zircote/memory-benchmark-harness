@@ -539,7 +539,7 @@ class TaskSelector:
 
         rng = random.Random(seed)
 
-        categories = list(TaskCategory)
+        list(TaskCategory)
         difficulties = [1, 2, 3, 4, 5]
 
         task_templates = [

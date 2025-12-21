@@ -907,9 +907,9 @@ class TestAdversarialHandling:
         ]
 
         for answer in normal_answers:
-            assert (
-                pipeline._check_adversarial_handling(answer) is False
-            ), f"Should not detect: {answer}"
+            assert pipeline._check_adversarial_handling(answer) is False, (
+                f"Should not detect: {answer}"
+            )
 
     def test_adversarial_question_flow(self) -> None:
         """Test full flow with adversarial questions."""

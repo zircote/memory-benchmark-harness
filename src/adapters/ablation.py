@@ -551,7 +551,7 @@ def create_ablation_adapter(
 
     if ablation_type not in ablation_map:
         raise ValueError(
-            f"Unknown ablation type: {ablation_type}. " f"Valid types: {list(ablation_map.keys())}"
+            f"Unknown ablation type: {ablation_type}. Valid types: {list(ablation_map.keys())}"
         )
 
     adapter_class = ablation_map[ablation_type]

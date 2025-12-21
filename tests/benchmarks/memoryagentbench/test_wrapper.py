@@ -306,7 +306,7 @@ class TestMemoryAgentBenchAgent:
 
         agent.adapter = mock_adapter
 
-        retrieved = agent.retrieve_for_question(cr_question)
+        agent.retrieve_for_question(cr_question)
 
         # Should have tried to get history
         assert mock_adapter.get_history.called

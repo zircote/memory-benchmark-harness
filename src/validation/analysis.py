@@ -105,7 +105,7 @@ class ValidationAnalyzer:
         """
         # Use first human annotation per sample
         pairs = []
-        for sample_id, annotations in self._by_sample.items():
+        for _sample_id, annotations in self._by_sample.items():
             human_judgment = annotations[0].human_judgment
             llm_judgment = annotations[0].sample.llm_judgment
 
@@ -134,7 +134,7 @@ class ValidationAnalyzer:
             return None
 
         pairs = []
-        for sample_id, annotations in multi_annotated.items():
+        for _sample_id, annotations in multi_annotated.items():
             # Compare first two annotators
             j1 = annotations[0].human_judgment
             j2 = annotations[1].human_judgment
@@ -176,7 +176,7 @@ class ValidationAnalyzer:
 
         # Build confusion matrix
         labels = [r.value for r in RubricLevel]
-        confusion: dict[str, dict[str, int]] = {l1: {l2: 0 for l2 in labels} for l1 in labels}
+        confusion: dict[str, dict[str, int]] = {l1: dict.fromkeys(labels, 0) for l1 in labels}
         for j1, j2 in normalized:
             confusion[j1.value][j2.value] += 1
 
@@ -240,8 +240,8 @@ class ValidationAnalyzer:
 
         # Count agreements and marginals
         labels = list(RubricLevel)
-        counts_a: dict[RubricLevel, int] = {l: 0 for l in labels}
-        counts_b: dict[RubricLevel, int] = {l: 0 for l in labels}
+        counts_a: dict[RubricLevel, int] = dict.fromkeys(labels, 0)
+        counts_b: dict[RubricLevel, int] = dict.fromkeys(labels, 0)
         agreements = 0
 
         for j1, j2 in pairs:
@@ -254,7 +254,7 @@ class ValidationAnalyzer:
         p_o = agreements / n
 
         # Expected agreement
-        p_e = sum((counts_a[l] / n) * (counts_b[l] / n) for l in labels)
+        p_e = sum((counts_a[level] / n) * (counts_b[level] / n) for level in labels)
 
         # Kappa
         if p_e == 1.0:
@@ -296,8 +296,8 @@ class ValidationAnalyzer:
 
         # Expected weighted agreement
         labels = list(RubricLevel)
-        counts_a: dict[RubricLevel, int] = {l: 0 for l in labels}
-        counts_b: dict[RubricLevel, int] = {l: 0 for l in labels}
+        counts_a: dict[RubricLevel, int] = dict.fromkeys(labels, 0)
+        counts_b: dict[RubricLevel, int] = dict.fromkeys(labels, 0)
 
         for j1, j2 in pairs:
             counts_a[j1] += 1
@@ -321,7 +321,7 @@ class ValidationAnalyzer:
         """
         # Basic counts
         unique_samples = len(self._by_sample)
-        annotators = set(a.annotator_id for a in self.annotations)
+        annotators = {a.annotator_id for a in self.annotations}
 
         # Judgment distribution
         judgment_dist: dict[str, int] = {}

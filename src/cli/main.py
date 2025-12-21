@@ -911,7 +911,13 @@ def publication_tables(
         title="Main Results",
         caption="Accuracy comparison across benchmarks and memory conditions",
         label="tab:main-results",
-        benchmark_order=["longmemeval", "locomo", "contextbench", "memoryagentbench", "terminalbench"],
+        benchmark_order=[
+            "longmemeval",
+            "locomo",
+            "contextbench",
+            "memoryagentbench",
+            "terminalbench",
+        ],
     )
     main_data = stats.get_main_results_data()
 
@@ -1012,6 +1018,7 @@ def publication_figures(
     """
     try:
         import importlib.util
+
         if importlib.util.find_spec("matplotlib") is None:
             raise ImportError("matplotlib not found")
     except ImportError as e:
@@ -1083,12 +1090,18 @@ def publication_figures(
     # Prepare CI data from summaries
     ci_data = []
     for s in stats.summaries:
-        ci_data.append({
-            "adapter": f"{s.adapter_name} ({s.benchmark_name})",
-            "accuracy": s.metrics.accuracy,
-            "ci_lower": s.metrics.accuracy_ci[0] if s.metrics.accuracy_ci[0] > 0 else s.metrics.accuracy,
-            "ci_upper": s.metrics.accuracy_ci[1] if s.metrics.accuracy_ci[1] > 0 else s.metrics.accuracy,
-        })
+        ci_data.append(
+            {
+                "adapter": f"{s.adapter_name} ({s.benchmark_name})",
+                "accuracy": s.metrics.accuracy,
+                "ci_lower": s.metrics.accuracy_ci[0]
+                if s.metrics.accuracy_ci[0] > 0
+                else s.metrics.accuracy,
+                "ci_upper": s.metrics.accuracy_ci[1]
+                if s.metrics.accuracy_ci[1] > 0
+                else s.metrics.accuracy,
+            }
+        )
 
     if ci_data:
         typer.echo("Generating Confidence Interval Plot...")
@@ -1164,13 +1177,15 @@ def analyze_conflict_resolution(
             # Find conflict resolution competency
             cr_data = competency_results.get("conflict_resolution", {})
             if cr_data:
-                condition_results.append({
-                    "trial_id": trial.get("trial_id"),
-                    "accuracy": cr_data.get("accuracy", 0),
-                    "total": cr_data.get("total_questions", 0),
-                    "correct": cr_data.get("correct_count", 0),
-                    "question_results": cr_data.get("question_results", []),
-                })
+                condition_results.append(
+                    {
+                        "trial_id": trial.get("trial_id"),
+                        "accuracy": cr_data.get("accuracy", 0),
+                        "total": cr_data.get("total_questions", 0),
+                        "correct": cr_data.get("correct_count", 0),
+                        "question_results": cr_data.get("question_results", []),
+                    }
+                )
 
         if condition_results:
             cr_results_by_condition[condition] = condition_results
@@ -1188,8 +1203,16 @@ def analyze_conflict_resolution(
             single_hop = [q for q in all_questions if q.get("difficulty") == "single_hop"]
             multi_hop = [q for q in all_questions if q.get("difficulty") == "multi_hop"]
 
-            single_acc = sum(1 for q in single_hop if q.get("correct")) / len(single_hop) if single_hop else None
-            multi_acc = sum(1 for q in multi_hop if q.get("correct")) / len(multi_hop) if multi_hop else None
+            single_acc = (
+                sum(1 for q in single_hop if q.get("correct")) / len(single_hop)
+                if single_hop
+                else None
+            )
+            multi_acc = (
+                sum(1 for q in multi_hop if q.get("correct")) / len(multi_hop)
+                if multi_hop
+                else None
+            )
 
             analysis["conditions"][condition] = {
                 "trials": len(condition_results),
@@ -1212,9 +1235,13 @@ def analyze_conflict_resolution(
         typer.echo(f"  Overall Accuracy: {metrics['avg_accuracy']:.1%}")
         typer.echo(f"  Total Questions: {metrics['total_questions']}")
         if metrics["single_hop_accuracy"] is not None:
-            typer.echo(f"  Single-hop ({metrics['single_hop_count']}): {metrics['single_hop_accuracy']:.1%}")
+            typer.echo(
+                f"  Single-hop ({metrics['single_hop_count']}): {metrics['single_hop_accuracy']:.1%}"
+            )
         if metrics["multi_hop_accuracy"] is not None:
-            typer.echo(f"  Multi-hop ({metrics['multi_hop_count']}): {metrics['multi_hop_accuracy']:.1%}")
+            typer.echo(
+                f"  Multi-hop ({metrics['multi_hop_count']}): {metrics['multi_hop_accuracy']:.1%}"
+            )
 
     # Compare conditions if we have both
     conditions = list(analysis["conditions"].keys())
@@ -1234,13 +1261,15 @@ def analyze_conflict_resolution(
         typer.echo(f"  {cond_b}: {acc_b:.1%}")
         typer.echo(f"  Difference: {diff:+.1%}")
 
-        analysis["comparisons"].append({
-            "condition_a": cond_a,
-            "condition_b": cond_b,
-            "accuracy_a": acc_a,
-            "accuracy_b": acc_b,
-            "difference": diff,
-        })
+        analysis["comparisons"].append(
+            {
+                "condition_a": cond_a,
+                "condition_b": cond_b,
+                "accuracy_a": acc_a,
+                "accuracy_b": acc_b,
+                "difference": diff,
+            }
+        )
 
     # Export analysis
     output_file = output_path / "conflict_resolution_analysis.json"
@@ -1345,18 +1374,20 @@ def export_phase2_samples(
                 question_results = raw_results.get("question_results", [])
 
                 for qr in question_results:
-                    cb_samples.append({
-                        "sample_id": f"cb_{condition}_{qr.get('question_id', len(cb_samples))}",
-                        "benchmark": "contextbench",
-                        "category": qr.get("category", "unknown"),
-                        "condition": condition,
-                        "question": qr.get("question", ""),
-                        "reference_answer": qr.get("reference_answer", ""),
-                        "model_response": qr.get("model_answer", qr.get("predicted", "")),
-                        "llm_judgment": qr.get("judgment_text", ""),
-                        "llm_score": 1.0 if qr.get("correct") else 0.0,
-                        "hop_count": qr.get("hop_count", 1),
-                    })
+                    cb_samples.append(
+                        {
+                            "sample_id": f"cb_{condition}_{qr.get('question_id', len(cb_samples))}",
+                            "benchmark": "contextbench",
+                            "category": qr.get("category", "unknown"),
+                            "condition": condition,
+                            "question": qr.get("question", ""),
+                            "reference_answer": qr.get("reference_answer", ""),
+                            "model_response": qr.get("model_answer", qr.get("predicted", "")),
+                            "llm_judgment": qr.get("judgment_text", ""),
+                            "llm_score": 1.0 if qr.get("correct") else 0.0,
+                            "hop_count": qr.get("hop_count", 1),
+                        }
+                    )
 
         # Sample
         if len(cb_samples) > samples:
@@ -1412,7 +1443,9 @@ def export_phase2_samples(
             cr_count = min(len(cr_samples), samples // 2)
             other_count = samples - cr_count
 
-            selected_cr = rng.sample(cr_samples, cr_count) if len(cr_samples) > cr_count else cr_samples
+            selected_cr = (
+                rng.sample(cr_samples, cr_count) if len(cr_samples) > cr_count else cr_samples
+            )
             selected_other = rng.sample(mab_samples, min(other_count, len(mab_samples)))
 
             mab_selected = selected_cr + selected_other
@@ -1429,22 +1462,34 @@ def export_phase2_samples(
     # Export to JSON
     json_path = output_path / "phase2_validation_samples.json"
     with json_path.open("w") as f:
-        json.dump({
-            "export_metadata": {
-                "total_samples": len(all_samples),
-                "samples_per_benchmark": samples,
-                "prioritize_cr": prioritize_cr,
-                "seed": seed,
+        json.dump(
+            {
+                "export_metadata": {
+                    "total_samples": len(all_samples),
+                    "samples_per_benchmark": samples,
+                    "prioritize_cr": prioritize_cr,
+                    "seed": seed,
+                },
+                "samples": all_samples,
             },
-            "samples": all_samples,
-        }, f, indent=2)
+            f,
+            indent=2,
+        )
 
     # Export to CSV
     csv_path = output_path / "phase2_validation_samples.csv"
     fieldnames = [
-        "sample_id", "benchmark", "category", "condition",
-        "question", "reference_answer", "model_response",
-        "llm_judgment", "llm_score", "human_score", "human_notes",
+        "sample_id",
+        "benchmark",
+        "category",
+        "condition",
+        "question",
+        "reference_answer",
+        "model_response",
+        "llm_judgment",
+        "llm_score",
+        "human_score",
+        "human_notes",
     ]
 
     with csv_path.open("w", newline="") as f:

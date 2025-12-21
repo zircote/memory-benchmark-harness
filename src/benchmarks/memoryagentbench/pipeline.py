@@ -323,9 +323,7 @@ class MemoryAgentBenchPipeline:
         if competencies is None:
             competencies = dataset.competencies
 
-        logger.info(
-            f"Starting MemoryAgentBench evaluation: " f"{[c.short_name for c in competencies]}"
-        )
+        logger.info(f"Starting MemoryAgentBench evaluation: {[c.short_name for c in competencies]}")
 
         competency_results: dict[Competency, CompetencyResult] = {}
 

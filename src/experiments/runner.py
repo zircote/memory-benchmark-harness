@@ -185,7 +185,7 @@ class ExperimentConfig:
         valid_benchmarks = {"longmemeval", "locomo"}
         if self.benchmark not in valid_benchmarks:
             raise ValueError(
-                f"Invalid benchmark: {self.benchmark}. " f"Must be one of: {valid_benchmarks}"
+                f"Invalid benchmark: {self.benchmark}. Must be one of: {valid_benchmarks}"
             )
         if self.num_trials < 1:
             raise ValueError("num_trials must be at least 1")

@@ -145,7 +145,11 @@ def main() -> None:
             success=True,
             output="SSH keys configured",
             execution_time_seconds=15.5,
-            metadata={"category": "system_administration", "memory_relevance": "high", "difficulty": 3},
+            metadata={
+                "category": "system_administration",
+                "memory_relevance": "high",
+                "difficulty": 3,
+            },
         ),
         TaskResult(
             task_id="task_2",

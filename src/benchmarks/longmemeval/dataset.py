@@ -274,7 +274,7 @@ def load_longmemeval(
         from datasets import load_dataset
     except ImportError as e:
         raise ImportError(
-            "The 'datasets' library is required. " "Install it with: pip install datasets"
+            "The 'datasets' library is required. Install it with: pip install datasets"
         ) from e
 
     logger.info(f"Loading LongMemEval {subset} subset from HuggingFace...")
@@ -379,20 +379,24 @@ def load_longmemeval_from_file(
             # Oracle format: questions with embedded haystack_sessions
             if "haystack_sessions" in item:
                 session_ids = item.get(
-                    "haystack_session_ids", [f"s_{idx}_{i}" for i in range(len(item["haystack_sessions"]))]
+                    "haystack_session_ids",
+                    [f"s_{idx}_{i}" for i in range(len(item["haystack_sessions"]))],
                 )
-                for sid, session_messages in zip(session_ids, item["haystack_sessions"]):
+                for sid, session_messages in zip(
+                    session_ids, item["haystack_sessions"], strict=False
+                ):
                     if sid not in seen_session_ids:
                         seen_session_ids.add(sid)
                         messages = [
-                            Message(role=m["role"], content=m["content"])
-                            for m in session_messages
+                            Message(role=m["role"], content=m["content"]) for m in session_messages
                         ]
                         sessions.append(
                             LongMemEvalSession(
                                 session_id=sid,
                                 messages=messages,
-                                timestamp=item.get("haystack_dates", [None])[0] if item.get("haystack_dates") else None,
+                                timestamp=item.get("haystack_dates", [None])[0]
+                                if item.get("haystack_dates")
+                                else None,
                             )
                         )
                 # Parse question with oracle-specific field mapping

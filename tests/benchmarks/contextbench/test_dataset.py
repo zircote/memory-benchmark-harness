@@ -163,7 +163,7 @@ class TestContextBenchDataset:
         assert len(results) >= 1  # Should find in at least alice.txt
 
         # Check that results contain matching lines
-        for file, lines in results:
+        for _file, lines in results:
             assert any("Alice" in line for line in lines)
 
     def test_grep_case_insensitive(self, sample_dataset: ContextBenchDataset) -> None:
@@ -217,8 +217,8 @@ class TestSyntheticDataset:
         dataset2 = generate_synthetic_dataset(seed=2)
 
         # Should have some differences (questions may differ)
-        q1_ids = {q.question_id for q in dataset1.questions}
-        q2_ids = {q.question_id for q in dataset2.questions}
+        {q.question_id for q in dataset1.questions}
+        {q.question_id for q in dataset2.questions}
         # IDs will be the same but content may differ
 
 

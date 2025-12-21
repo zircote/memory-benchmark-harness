@@ -467,7 +467,7 @@ Email: {first.lower()}.{last.lower()}@example.com
         content = f"""Project: {project}
 Status: Active
 Team Members:
-{chr(10).join('- ' + m for m in members)}
+{chr(10).join("- " + m for m in members)}
 """
         files.append(
             ContextBenchFile(

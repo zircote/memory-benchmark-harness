@@ -68,12 +68,12 @@ class MockAdapter(MemorySystemAdapter):
         self._clear_failure: str | None = None
 
         # Callbacks for dynamic behavior
-        self._search_callback: Callable[
-            [str, int, float, dict[str, Any] | None], list[MemoryItem]
-        ] | None = None
-        self._add_callback: Callable[
-            [str, dict[str, Any] | None], MemoryOperationResult
-        ] | None = None
+        self._search_callback: (
+            Callable[[str, int, float, dict[str, Any] | None], list[MemoryItem]] | None
+        ) = None
+        self._add_callback: Callable[[str, dict[str, Any] | None], MemoryOperationResult] | None = (
+            None
+        )
 
     def configure_search(self, results: list[MemoryItem]) -> None:
         """Configure what search() will return.

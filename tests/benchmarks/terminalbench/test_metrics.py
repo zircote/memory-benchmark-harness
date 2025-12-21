@@ -197,7 +197,7 @@ class TestTerminalBenchMetricsCalculator:
         metrics = calculator.calculate([sample_trial])
 
         assert len(metrics.by_difficulty) > 0
-        assert all(1 <= d <= 5 for d in metrics.by_difficulty.keys())
+        assert all(1 <= d <= 5 for d in metrics.by_difficulty)
 
     def test_compare(
         self,

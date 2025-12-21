@@ -344,7 +344,7 @@ class CategoryBreakdownTable(TableGenerator):
         # Determine adapter columns
         adapters = self.adapters
         if not adapters:
-            adapters = sorted(k for k in data[0].keys() if k != "category")
+            adapters = sorted(k for k in data[0] if k != "category")
 
         col_spec = "l" + "c" * len(adapters)
 
@@ -397,7 +397,7 @@ class CategoryBreakdownTable(TableGenerator):
         # Determine adapter columns
         adapters = self.adapters
         if not adapters:
-            adapters = sorted(k for k in data[0].keys() if k != "category")
+            adapters = sorted(k for k in data[0] if k != "category")
 
         lines = [f"## {self.title}", ""]
 

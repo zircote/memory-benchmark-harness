@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture
-def mock_adapter() -> "MemorySystemAdapter":
+def mock_adapter() -> MemorySystemAdapter:
     """Create a fresh MockAdapter for each test."""
     from src.adapters.mock import MockAdapter
 
@@ -26,7 +26,7 @@ def mock_adapter() -> "MemorySystemAdapter":
 
 
 @pytest.fixture
-def no_memory_adapter() -> "MemorySystemAdapter":
+def no_memory_adapter() -> MemorySystemAdapter:
     """Create a NoMemoryAdapter for baseline testing."""
     from src.adapters.no_memory import NoMemoryAdapter
 

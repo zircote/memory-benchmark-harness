@@ -314,7 +314,7 @@ ACTION: <OPEN_FILE(path) or GREP(pattern) or ANSWER(your answer)>
 
         # ReAct loop
         answer = ""
-        for iteration in range(self.max_operations):
+        for _iteration in range(self.max_operations):
             try:
                 response = self.llm.generate(
                     prompt=prompt,

@@ -33,7 +33,6 @@ def main() -> None:
         NoVersionHistoryAdapter,
         RecencyOnlyAdapter,
     )
-    from src.adapters.base import MemoryItem
     from src.adapters.mock import MockAdapter
 
     # All ablation adapters wrap a base adapter (decorator pattern)

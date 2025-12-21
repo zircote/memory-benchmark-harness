@@ -515,7 +515,7 @@ class LoCoMoPipeline:
         # Log per-category results
         for cat_name, metrics in category_metrics.items():
             logger.info(
-                f"  {cat_name}: {metrics.accuracy:.2%} accuracy, " f"{metrics.mean_score:.3f} score"
+                f"  {cat_name}: {metrics.accuracy:.2%} accuracy, {metrics.mean_score:.3f} score"
             )
 
         return assessment_result

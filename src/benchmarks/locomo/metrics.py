@@ -223,8 +223,7 @@ class LoCoMoMetrics:
         adv = self.adversarial_metrics
         lines.append(f"  Total Adversarial: {adv.total_adversarial}")
         lines.append(
-            f"  Correctly Identified: {adv.correctly_identified} "
-            f"({adv.identification_rate:.2%})"
+            f"  Correctly Identified: {adv.correctly_identified} ({adv.identification_rate:.2%})"
         )
         lines.append(f"  False Acceptance Rate: {adv.false_acceptance_rate:.2%}")
 

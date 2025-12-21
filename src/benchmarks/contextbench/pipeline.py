@@ -229,7 +229,7 @@ class ContextBenchPipeline:
         """Aggregate results by hop count."""
         breakdown: dict[int, dict[str, Any]] = {}
 
-        hop_counts = set(r.hop_count for r in results)
+        hop_counts = {r.hop_count for r in results}
         for hop in sorted(hop_counts):
             hop_results = [r for r in results if r.hop_count == hop]
             if hop_results:

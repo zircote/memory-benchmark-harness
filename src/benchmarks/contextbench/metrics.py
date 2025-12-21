@@ -276,7 +276,7 @@ class MetricsCalculator:
         lines.append("## Overall Performance\n")
         ci_str = ""
         if metrics.accuracy_ci:
-            ci_str = f" [{metrics.accuracy_ci.lower:.1%}, " f"{metrics.accuracy_ci.upper:.1%}]"
+            ci_str = f" [{metrics.accuracy_ci.lower:.1%}, {metrics.accuracy_ci.upper:.1%}]"
         lines.append(f"- **Accuracy**: {metrics.accuracy:.1%}{ci_str}")
         lines.append(f"- **Total Questions**: {metrics.total_questions}")
         lines.append(f"- **Total Cost**: ${metrics.total_cost:.4f}")

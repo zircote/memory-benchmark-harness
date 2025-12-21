@@ -50,7 +50,6 @@ class AnnotatedSample:
             True if agree, False if disagree, None if LLM judgment unknown
         """
         llm = self.sample.llm_judgment.lower()
-        human = self.human_judgment.value
 
         if not llm or llm == "unknown":
             return None

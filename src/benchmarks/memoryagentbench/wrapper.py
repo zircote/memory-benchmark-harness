@@ -399,7 +399,7 @@ class MemoryAgentBenchAgent:
         """
         if question.competency != Competency.CONFLICT_RESOLUTION:
             logger.warning(
-                f"answer_with_conflict_check called for non-CR question: " f"{question.question_id}"
+                f"answer_with_conflict_check called for non-CR question: {question.question_id}"
             )
 
         # Ingest context
@@ -495,7 +495,7 @@ class MemoryAgentBenchAgent:
 
         # Find entities with multiple different values
         for entity, facts in facts_by_entity.items():
-            unique_values = set(f[0] for f in facts)
+            unique_values = {f[0] for f in facts}
             if len(unique_values) > 1:
                 conflicts.append(
                     {

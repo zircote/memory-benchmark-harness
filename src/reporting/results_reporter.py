@@ -356,8 +356,7 @@ class ResultsReporter:
             conditions = ", ".join(sorted(report.condition_summaries.keys()))
             best_acc = max(s.accuracy_mean for s in report.condition_summaries.values())
             combined_lines.append(
-                f"| {report.experiment_id} | {report.benchmark} | "
-                f"{conditions} | {best_acc:.1%} |"
+                f"| {report.experiment_id} | {report.benchmark} | {conditions} | {best_acc:.1%} |"
             )
 
         combined_lines.append("")

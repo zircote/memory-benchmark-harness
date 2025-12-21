@@ -145,7 +145,7 @@ class PerformanceBarChart(FigureGenerator):
             return None
 
         # Extract benchmarks and adapters
-        benchmarks = sorted(set(b for row in data for b in row.get("benchmarks", {}).keys()))
+        benchmarks = sorted({b for row in data for b in row.get("benchmarks", {})})
         adapters = [row["adapter"] for row in data]
 
         if not benchmarks:
@@ -194,7 +194,7 @@ class PerformanceBarChart(FigureGenerator):
             "contextbench": "Context-Bench",
             "terminalbench": "Terminal-Bench",
         }
-        return [replacements.get(l.lower(), l) for l in labels]
+        return [replacements.get(label.lower(), label) for label in labels]
 
 
 @dataclass
@@ -235,7 +235,7 @@ class AblationHeatmap(FigureGenerator):
         bars = ax.barh(y_pos, deltas, color=colors, alpha=0.85, height=0.6)
 
         # Add annotations
-        for i, (bar, delta) in enumerate(zip(bars, deltas, strict=False)):
+        for i, (_bar, delta) in enumerate(zip(bars, deltas, strict=False)):
             color = "white" if abs(delta) > 0.15 else "black"
             ax.annotate(
                 f"{delta:+.1%}",
@@ -300,7 +300,7 @@ class CategoryRadarPlot(FigureGenerator):
             return None
 
         categories = [row["category"] for row in data]
-        adapters = sorted(k for k in data[0].keys() if k != "category")
+        adapters = sorted(k for k in data[0] if k != "category")
 
         if len(categories) < 3:
             logger.warning("Radar plot requires at least 3 categories")
@@ -446,7 +446,7 @@ class HumanAgreementPlot(FigureGenerator):
         x = np.arange(len(benchmarks))
         width = 0.35
 
-        bars1 = ax.bar(
+        ax.bar(
             x - width / 2,
             agreement,
             width,
@@ -454,7 +454,7 @@ class HumanAgreementPlot(FigureGenerator):
             color=self.colors["agreement"],
             alpha=0.85,
         )
-        bars2 = ax.bar(
+        ax.bar(
             x + width / 2,
             kappa,
             width,

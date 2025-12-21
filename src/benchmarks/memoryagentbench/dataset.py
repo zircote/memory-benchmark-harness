@@ -403,7 +403,7 @@ def load_memoryagentbench(
         from datasets import load_dataset
     except ImportError as e:
         raise ImportError(
-            "The 'datasets' library is required. " "Install it with: pip install datasets"
+            "The 'datasets' library is required. Install it with: pip install datasets"
         ) from e
 
     if competencies is None:
@@ -452,7 +452,7 @@ def load_memoryagentbench(
         )
 
         logger.info(
-            f"Loaded {competency.short_name}: {len(questions)} questions " f"from {len(data)} rows"
+            f"Loaded {competency.short_name}: {len(questions)} questions from {len(data)} rows"
         )
 
     logger.info(

@@ -803,7 +803,7 @@ class TestResultsReporterGenerateCombinedReport:
 
         result = reporter.generate_combined_report(experiment_results_list, tmp_path)
 
-        for exp_id, outputs in result["output_files"].items():
+        for _exp_id, outputs in result["output_files"].items():
             assert "json" in outputs
             assert "markdown" in outputs
             assert Path(outputs["json"]).exists()

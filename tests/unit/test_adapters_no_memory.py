@@ -360,7 +360,7 @@ class TestNoMemoryAdapterEdgeCases:
         r1 = adapter.add("First")
         r2 = adapter.add("Second")
         adapter.delete(r1.memory_id)  # type: ignore[arg-type]
-        r3 = adapter.add("Third")
+        adapter.add("Third")
         adapter.update(r2.memory_id, "Updated second")  # type: ignore[arg-type]
 
         stats = adapter.get_stats()
