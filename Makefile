@@ -145,9 +145,14 @@ endif
 
 ##@ CI Helpers
 
+quality: lint format-check typecheck test-unit ## Run all quality gates (mirrors GitHub Actions CI)
+	@echo "$(GREEN)All quality gates passed!$(NC)"
+
+ci: quality ## Alias for quality (run all CI checks locally)
+
 ci-lint: ## CI: Run linting checks
-	$(RUN) ruff check src tests
-	$(RUN) ruff format --check src tests
+	$(RUN) ruff check src tests scripts
+	$(RUN) ruff format --check src tests scripts
 
 ci-typecheck: ## CI: Run type checking
 	$(RUN) mypy src --ignore-missing-imports

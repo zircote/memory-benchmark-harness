@@ -181,7 +181,8 @@ class GitNotesAdapter(MemorySystemAdapter):
             )
 
             # SyncService accepts repo_path for initialization
-            self._sync_service = get_sync_service(repo_path=self._repo_path)  # type: ignore[operator]
+            # Type ignore needed: mypy can't resolve git_notes_memory types at static analysis time
+            self._sync_service = get_sync_service(repo_path=self._repo_path)  # type: ignore
 
             self._initialized = True
             logger.info(
