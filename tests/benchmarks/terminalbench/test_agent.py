@@ -121,7 +121,7 @@ class TestMemoryAugmentedInstalledAgent:
             env_vars={"API_KEY": "test123"},  # pragma: allowlist secret
         )
         env = agent._env
-        assert env["API_KEY"] == "test123"
+        assert env["API_KEY"] == "test123"  # pragma: allowlist secret
 
     def test_install_script_path_creates_file(self, agent: MemoryAugmentedInstalledAgent) -> None:
         """Test that install script path creates a file."""
