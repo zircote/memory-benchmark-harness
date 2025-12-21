@@ -12,7 +12,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: "3.13"
   UV_VERSION: "0.5"
 
 jobs:
@@ -28,16 +27,16 @@ jobs:
           version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
+        run: uv python install 3.11
 
       - name: Install dependencies
         run: uv sync --frozen
 
       - name: Run ruff check
-        run: uv run ruff check src tests
+        run: uv run ruff check src tests scripts
 
       - name: Run ruff format check
-        run: uv run ruff format --check src tests
+        run: uv run ruff format --check src tests scripts
 
   typecheck:
     name: Type Check
@@ -51,7 +50,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
+        run: uv python install 3.11
 
       - name: Install dependencies
         run: uv sync --frozen
@@ -65,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
 
@@ -83,15 +82,18 @@ jobs:
         run: uv sync --frozen
 
       - name: Run unit tests
-        run: uv run pytest tests/unit -v --tb=short --cov=src --cov-report=xml
+        run: uv run pytest tests/unit -v --tb=short --cov=src --cov-report=xml --cov-report=term-missing
 
-      - name: Upload coverage
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.11'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
           fail_ci_if_error: false
+          verbose: true
 
   integration-test:
     name: Integration Tests
@@ -107,7 +109,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
 
       - name: Set up Python
-        run: uv python install ${{ env.PYTHON_VERSION }}
+        run: uv python install 3.11
 
       - name: Install dependencies
         run: uv sync --frozen
@@ -118,6 +120,29 @@ jobs:
 
       - name: Run integration tests
         run: uv run pytest tests/integration -v --tb=short
+
+  pre-commit:
+    name: Pre-commit Hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --all-files --show-diff-on-failure
+        env:
+          SKIP: mypy
 
   docker-build:
     name: Docker Build (CPU)
@@ -143,16 +168,24 @@ jobs:
         run: |
           docker run --rm benchmark-harness:cpu-latest python -c "import src.adapters; print('Import successful')"
 
-  # GPU tests require self-hosted runners with GPU support
-  # See GPU_RUNNER_SETUP.md for configuration instructions
-  # gpu-test:
-  #   name: GPU Tests
-  #   runs-on: [self-hosted, gpu]
-  #   needs: [test]
-  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Build GPU image
-  #       run: docker build -t benchmark-harness:gpu-latest -f docker/Dockerfile.gpu .
-  #     - name: Run GPU tests
-  #       run: docker run --rm --gpus all benchmark-harness:gpu-latest pytest tests/ -v -m gpu
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, pre-commit]
+    if: always()
+    steps:
+      - name: Check all jobs passed
+        env:
+          LINT_RESULT: ${{ needs.lint.result }}
+          TYPECHECK_RESULT: ${{ needs.typecheck.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          PRECOMMIT_RESULT: ${{ needs.pre-commit.result }}
+        run: |
+          if [[ "$LINT_RESULT" != "success" ]] ||
+             [[ "$TYPECHECK_RESULT" != "success" ]] ||
+             [[ "$TEST_RESULT" != "success" ]] ||
+             [[ "$PRECOMMIT_RESULT" != "success" ]]; then
+            echo "One or more jobs failed"
+            exit 1
+          fi
+          echo "All required jobs passed!"
