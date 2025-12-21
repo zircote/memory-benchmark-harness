@@ -160,6 +160,7 @@ jobs:
           context: .
           file: docker/Dockerfile.cpu
           push: false
+          load: true
           tags: benchmark-harness:cpu-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max

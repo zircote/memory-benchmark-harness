@@ -83,3 +83,4 @@ Thumbs.db
 .cs-session-state.json
 .memory/
 coverage.xml
+.prompt-log.json
