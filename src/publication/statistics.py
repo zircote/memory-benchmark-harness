@@ -238,7 +238,7 @@ class PublicationStatistics:
         for category, cat_data in category_data.items():
             if isinstance(cat_data, dict):
                 result[category] = self._extract_metrics(cat_data)
-            elif isinstance(cat_data, (int, float)):
+            elif isinstance(cat_data, int | float):
                 result[category] = UnifiedMetrics(accuracy=float(cat_data))
 
         return result

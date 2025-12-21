@@ -32,22 +32,22 @@ services:
       resources:
         reservations:
           devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
     volumes:
-      - ../data:/app/data:ro
-      - ../results:/app/results:rw
-      - ../config:/app/config:ro
-      - benchmark-cache:/app/.cache/huggingface
+    - ../data:/app/data:ro
+    - ../results:/app/results:rw
+    - ../config:/app/config:ro
+    - benchmark-cache:/app/.cache/huggingface
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - HF_TOKEN=${HF_TOKEN:-}
-      - BENCHMARK_MODE=full
+    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    - HF_TOKEN=${HF_TOKEN:-}
+    - BENCHMARK_MODE=full
     networks:
-      - benchmark-net
-    restart: "no"
+    - benchmark-net
+    restart: 'no'
 
   # CPU-only benchmark for CI and quick runs
   benchmark-lite:
@@ -57,18 +57,18 @@ services:
     image: benchmark-harness:cpu
     container_name: benchmark-harness-cpu
     volumes:
-      - ../data:/app/data:ro
-      - ../results:/app/results:rw
-      - ../config:/app/config:ro
+    - ../data:/app/data:ro
+    - ../results:/app/results:rw
+    - ../config:/app/config:ro
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - BENCHMARK_MODE=lite
-      # Disable GPU-dependent features
-      - DISABLE_LOCAL_EMBEDDINGS=1
+    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    - BENCHMARK_MODE=lite
+    # Disable GPU-dependent features
+    - DISABLE_LOCAL_EMBEDDINGS=1
     networks:
-      - benchmark-net
-    restart: "no"
+    - benchmark-net
+    restart: 'no'
 
   # Development environment with live reload
   dev:
@@ -79,14 +79,14 @@ services:
     image: benchmark-harness:dev
     container_name: benchmark-harness-dev
     volumes:
-      # Mount source code for live reload
-      - ..:/app:cached
-      # Preserve venv across rebuilds
-      - dev-venv:/app/.venv
+    # Mount source code for live reload
+    - ..:/app:cached
+    # Preserve venv across rebuilds
+    - dev-venv:/app/.venv
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - PYTHONDONTWRITEBYTECODE=1
+    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    - PYTHONDONTWRITEBYTECODE=1
     working_dir: /app
     command: >
       bash -c "
@@ -98,7 +98,7 @@ services:
     stdin_open: true
     tty: true
     networks:
-      - benchmark-net
+    - benchmark-net
 
   # Run tests in container
   test:
@@ -108,18 +108,18 @@ services:
     image: benchmark-harness:test
     container_name: benchmark-harness-test
     volumes:
-      - ../tests:/app/tests:ro
-      - ../src:/app/src:ro
-      - test-results:/app/results
+    - ../tests:/app/tests:ro
+    - ../src:/app/src:ro
+    - test-results:/app/results
     environment:
-      - PYTHONDONTWRITEBYTECODE=1
+    - PYTHONDONTWRITEBYTECODE=1
     command: >
       bash -c "
         uv sync --frozen --dev;
         pytest tests/ -v --tb=short --cov=src --cov-report=xml:/app/results/coverage.xml
       "
     networks:
-      - benchmark-net
+    - benchmark-net
 
 networks:
   benchmark-net:

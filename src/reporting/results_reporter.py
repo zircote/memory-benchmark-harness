@@ -167,7 +167,7 @@ class ResultsReporter:
             if trial.get("success", True):
                 metrics = trial.get("metrics", {})
                 for key, value in metrics.items():
-                    if key != metric_key and isinstance(value, (int, float)):
+                    if key != metric_key and isinstance(value, int | float):
                         if key not in additional_metrics:
                             additional_metrics[key] = value
                 break
