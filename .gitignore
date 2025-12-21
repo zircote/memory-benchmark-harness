@@ -82,3 +82,4 @@ Thumbs.db
 .prompt-log-enabled
 .cs-session-state.json
 .memory/
+coverage.xml
