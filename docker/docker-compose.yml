@@ -1,0 +1,137 @@
+# Memory Benchmark Harness - Docker Compose Configuration
+#
+# Services:
+#   - benchmark: Full GPU-enabled benchmark runner
+#   - benchmark-lite: CPU-only for CI and quick runs
+#   - dev: Development environment with live reload
+#
+# Usage:
+#   Full benchmark with GPU:
+#     docker compose up benchmark
+#
+#   CPU-only for CI:
+#     docker compose up benchmark-lite
+#
+#   Development mode:
+#     docker compose up dev
+#
+# Environment Variables:
+#   - OPENAI_API_KEY: Required for LLM-as-Judge evaluation
+#   - ANTHROPIC_API_KEY: Optional for Anthropic models
+#   - HF_TOKEN: Optional for gated HuggingFace models
+
+services:
+  # Full GPU benchmark runner
+  benchmark:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gpu
+    image: benchmark-harness:gpu
+    container_name: benchmark-harness-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+    volumes:
+    - ../data:/app/data:ro
+    - ../results:/app/results:rw
+    - ../config:/app/config:ro
+    - benchmark-cache:/app/.cache/huggingface
+    environment:
+    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    - HF_TOKEN=${HF_TOKEN:-}
+    - BENCHMARK_MODE=full
+    networks:
+    - benchmark-net
+    restart: no
+
+  # CPU-only benchmark for CI and quick runs
+  benchmark-lite:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cpu
+    image: benchmark-harness:cpu
+    container_name: benchmark-harness-cpu
+    volumes:
+    - ../data:/app/data:ro
+    - ../results:/app/results:rw
+    - ../config:/app/config:ro
+    environment:
+    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    - BENCHMARK_MODE=lite
+    # Disable GPU-dependent features
+    - DISABLE_LOCAL_EMBEDDINGS=1
+    networks:
+    - benchmark-net
+    restart: no
+
+  # Development environment with live reload
+  dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cpu
+      target: base
+    image: benchmark-harness:dev
+    container_name: benchmark-harness-dev
+    volumes:
+    # Mount source code for live reload
+    - ..:/app:cached
+    # Preserve venv across rebuilds
+    - dev-venv:/app/.venv
+    environment:
+    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    - PYTHONDONTWRITEBYTECODE=1
+    working_dir: /app
+    command: >
+      bash -c "
+        uv venv /app/.venv 2>/dev/null || true;
+        . /app/.venv/bin/activate;
+        uv sync --frozen;
+        exec bash
+      "
+    stdin_open: true
+    tty: true
+    networks:
+    - benchmark-net
+
+  # Run tests in container
+  test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cpu
+    image: benchmark-harness:test
+    container_name: benchmark-harness-test
+    volumes:
+    - ../tests:/app/tests:ro
+    - ../src:/app/src:ro
+    - test-results:/app/results
+    environment:
+    - PYTHONDONTWRITEBYTECODE=1
+    command: >
+      bash -c "
+        uv sync --frozen --dev;
+        pytest tests/ -v --tb=short --cov=src --cov-report=xml:/app/results/coverage.xml
+      "
+    networks:
+    - benchmark-net
+
+networks:
+  benchmark-net:
+    driver: bridge
+
+volumes:
+  # Persistent cache for HuggingFace models (avoids re-downloading)
+  benchmark-cache:
+    driver: local
+  # Persistent venv for dev container
+  dev-venv:
+    driver: local
+  # Test results volume
+  test-results:
+    driver: local
