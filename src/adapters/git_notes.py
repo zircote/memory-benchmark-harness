@@ -136,6 +136,9 @@ class GitNotesAdapter(MemorySystemAdapter):
         Lazy initialization allows the adapter to be created before
         the git repository is fully set up.
 
+        Creates per-repository service instances (not singletons) to ensure
+        proper isolation when working with different repositories.
+
         Raises:
             ImportError: If git-notes-memory-manager is not installed
             ValueError: If repo_path is not a valid git repository
@@ -144,29 +147,44 @@ class GitNotesAdapter(MemorySystemAdapter):
             return
 
         try:
-            from git_notes_memory import (
-                get_capture_service,
-                get_recall_service,
-                get_sync_service,
-            )
+            from git_notes_memory import get_sync_service
+            from git_notes_memory.capture import CaptureService
+            from git_notes_memory.config import get_project_index_path
+            from git_notes_memory.embedding import get_default_service as get_embedding_service
             from git_notes_memory.index import IndexService as IndexSvc
+            from git_notes_memory.recall import RecallService
 
-            self._capture_service = get_capture_service(repo_path=self._repo_path)
-            self._recall_service = get_recall_service()
+            # Create project-specific IndexService for this repo
+            # All services share this instance for consistency
+            index_path = get_project_index_path(self._repo_path)
+            self._index_service = IndexSvc(index_path)
+            self._index_service.initialize()
+
+            # Get shared embedding service (singleton is fine for model)
+            embedding_service = get_embedding_service()
+
+            # Create per-repo CaptureService with our index and embedding services
+            # This ensures captures are indexed to the correct database
+            self._capture_service = CaptureService()
+            self._capture_service.set_index_service(self._index_service)
+            self._capture_service.set_embedding_service(embedding_service)
+
+            # Create per-repo RecallService with our index and embedding services
+            # This ensures searches query the correct database
+            self._recall_service = RecallService(
+                index_path=index_path,
+                index_service=self._index_service,
+                embedding_service=embedding_service,
+            )
+
+            # SyncService accepts repo_path for initialization
             self._sync_service = get_sync_service(repo_path=self._repo_path)
-
-            # Get the index service for clear() and get_stats()
-            # This is a lower-level access but needed for these operations
-            if hasattr(self._sync_service, "_index"):
-                self._index_service = self._sync_service._index
-            else:
-                # Fallback: create a new index service
-                self._index_service = IndexSvc()
 
             self._initialized = True
             logger.info(
-                "GitNotesAdapter initialized for repo: %s",
+                "GitNotesAdapter initialized for repo: %s (index: %s)",
                 self._repo_path,
+                index_path,
             )
 
         except ImportError as e:
