@@ -577,8 +577,8 @@ class TestBenchmarkPipelineIntegration:
         assert result.correct_count == 2
         assert len(result.question_results) == 2
 
-        # Verify judge was called
-        assert judge.batch_call_count == 1
+        # Verify judge was called (pipeline uses individual judge calls for progress)
+        assert judge.call_count == 2
 
     def test_pipeline_with_partial_results(self) -> None:
         """Test pipeline with mixed correct/incorrect results."""
@@ -595,27 +595,32 @@ class TestBenchmarkPipelineIntegration:
                 ]
                 self.idx = 0
 
+            def judge(
+                self,
+                question: str,
+                reference_answer: str,
+                model_answer: str,
+                *,
+                skip_cache: bool = False,  # noqa: ARG002
+            ) -> Judgment:
+                res, score = self.results[self.idx % len(self.results)]
+                self.idx += 1
+                return Judgment(
+                    result=res,
+                    score=score,
+                    reasoning="Test",
+                    question=question,
+                    reference_answer=reference_answer,
+                    model_answer=model_answer,
+                    metadata={},
+                    cached=False,
+                    timestamp=datetime.now(),
+                )
+
             def batch_judge(
                 self, items: list[tuple[str, str, str]], *, skip_cache: bool = False
             ) -> list[Judgment]:
-                judgments = []
-                for q, ref, ans in items:
-                    res, score = self.results[self.idx % len(self.results)]
-                    self.idx += 1
-                    judgments.append(
-                        Judgment(
-                            result=res,
-                            score=score,
-                            reasoning="Test",
-                            question=q,
-                            reference_answer=ref,
-                            model_answer=ans,
-                            metadata={},
-                            cached=False,
-                            timestamp=datetime.now(),
-                        )
-                    )
-                return judgments
+                return [self.judge(q, ref, ans) for q, ref, ans in items]
 
         judge = MixedJudge()
         pipeline = BenchmarkPipeline(adapter, llm, judge, relevant_sessions_only=False)
