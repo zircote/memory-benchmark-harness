@@ -2,7 +2,7 @@
 # Primary interface for development commands
 # Requires: uv (preferred) or pip
 
-.PHONY: all install dev test test-unit test-integration lint format typecheck clean check help pre-commit coverage docs
+.PHONY: all install dev test test-unit test-integration test-e2e test-all lint format typecheck clean check help pre-commit coverage docs docker-build-cpu docker-build-gpu docker-test docker-test-e2e docker-test-all docker-smoke docker-benchmark-locomo docker-benchmark-lme docker-benchmark-all docker-benchmark-quick benchmark-report benchmark-publication benchmark-full-pipeline
 
 # Default Python version for local development
 PYTHON_VERSION ?= 3.11
@@ -102,6 +102,14 @@ test-quick: ## Run tests without coverage (faster)
 	@echo "$(BLUE)Running tests (no coverage)...$(NC)"
 	$(RUN) pytest tests/unit -v --tb=short
 
+test-e2e: ## Run e2e tests (requires network for dataset downloads)
+	@echo "$(BLUE)Running e2e tests...$(NC)"
+	$(RUN) pytest tests/ -v --tb=short -m e2e
+
+test-all: ## Run all tests including e2e
+	@echo "$(BLUE)Running all tests...$(NC)"
+	$(RUN) pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+
 coverage: ## Generate HTML coverage report
 	@echo "$(BLUE)Generating coverage report...$(NC)"
 	$(RUN) pytest tests/ --cov=src --cov-report=html --cov-report=xml
@@ -166,10 +174,95 @@ ci-test: ## CI: Unit tests with coverage (exact CI parity)
 ##@ Docker
 
 docker-build-cpu: ## Build CPU Docker image
-	docker build -t benchmark-harness:cpu-latest -f docker/Dockerfile.cpu .
+	docker build -t benchmark-harness:cpu -f docker/Dockerfile.cpu .
 
 docker-build-gpu: ## Build GPU Docker image
-	docker build -t benchmark-harness:gpu-latest -f docker/Dockerfile.gpu .
+	docker build -t benchmark-harness:gpu -f docker/Dockerfile.gpu .
 
-docker-test: docker-build-cpu ## Test Docker image
-	docker run --rm benchmark-harness:cpu-latest python -c "import src.adapters; print('Import successful')"
+docker-test: docker-build-cpu ## Run unit tests in Docker (excludes e2e)
+	@echo "$(BLUE)Running unit tests in Docker...$(NC)"
+	docker compose -f docker/docker-compose.yml run --rm test
+
+docker-test-e2e: docker-build-cpu ## Run e2e tests in Docker (downloads datasets)
+	@echo "$(BLUE)Running e2e tests in Docker...$(NC)"
+	docker compose -f docker/docker-compose.yml run --rm test-e2e
+
+docker-test-all: docker-build-cpu ## Run all tests in Docker (unit + e2e)
+	@echo "$(BLUE)Running all tests in Docker...$(NC)"
+	docker compose -f docker/docker-compose.yml run --rm test
+	docker compose -f docker/docker-compose.yml run --rm test-e2e
+
+docker-smoke: docker-build-cpu ## Quick Docker sanity check (import test)
+	docker run --rm benchmark-harness:cpu python -c "import src.adapters; print('Import successful')"
+
+##@ Benchmark Experiments (Publication)
+
+# Configuration for publication runs
+BENCHMARK_TRIALS ?= 5
+BENCHMARK_ADAPTERS ?= git-notes,no-memory
+BENCHMARK_OUTPUT ?= results
+
+docker-benchmark-locomo: docker-build-cpu ## Run LoCoMo benchmark in Docker
+	@echo "$(BLUE)Running LoCoMo benchmark (trials=$(BENCHMARK_TRIALS), adapters=$(BENCHMARK_ADAPTERS))...$(NC)"
+	@mkdir -p $(BENCHMARK_OUTPUT)
+	docker compose -f docker/docker-compose.yml run --rm \
+		-e OPENAI_API_KEY=$(OPENAI_API_KEY) \
+		benchmark-lite run locomo \
+		--adapter $(BENCHMARK_ADAPTERS) \
+		--trials $(BENCHMARK_TRIALS) \
+		--output /app/results
+	@echo "$(GREEN)LoCoMo results saved to $(BENCHMARK_OUTPUT)/$(NC)"
+
+docker-benchmark-lme: docker-build-cpu ## Run LongMemEval benchmark in Docker
+	@echo "$(BLUE)Running LongMemEval benchmark (trials=$(BENCHMARK_TRIALS), adapters=$(BENCHMARK_ADAPTERS))...$(NC)"
+	@mkdir -p $(BENCHMARK_OUTPUT)
+	docker compose -f docker/docker-compose.yml run --rm \
+		-e OPENAI_API_KEY=$(OPENAI_API_KEY) \
+		benchmark-lite run longmemeval \
+		--adapter $(BENCHMARK_ADAPTERS) \
+		--trials $(BENCHMARK_TRIALS) \
+		--output /app/results
+	@echo "$(GREEN)LongMemEval results saved to $(BENCHMARK_OUTPUT)/$(NC)"
+
+docker-benchmark-all: docker-build-cpu ## Run ALL benchmarks in Docker (publication)
+	@echo "$(BLUE)Running all benchmarks for publication...$(NC)"
+	@echo "$(YELLOW)Configuration: trials=$(BENCHMARK_TRIALS), adapters=$(BENCHMARK_ADAPTERS)$(NC)"
+	@mkdir -p $(BENCHMARK_OUTPUT)
+	$(MAKE) docker-benchmark-locomo
+	$(MAKE) docker-benchmark-lme
+	@echo "$(GREEN)All benchmark results saved to $(BENCHMARK_OUTPUT)/$(NC)"
+
+docker-benchmark-quick: docker-build-cpu ## Quick benchmark run (1 trial, mock adapter)
+	@echo "$(BLUE)Running quick benchmark validation...$(NC)"
+	@mkdir -p $(BENCHMARK_OUTPUT)
+	docker compose -f docker/docker-compose.yml run --rm \
+		benchmark-lite run locomo \
+		--adapter mock \
+		--trials 1 \
+		--output /app/results
+	@echo "$(GREEN)Quick validation complete$(NC)"
+
+benchmark-report: ## Generate reports from benchmark results
+	@echo "$(BLUE)Generating benchmark reports...$(NC)"
+	@if ls $(BENCHMARK_OUTPUT)/exp_*.json 1>/dev/null 2>&1; then \
+		for f in $(BENCHMARK_OUTPUT)/exp_*.json; do \
+			$(RUN) benchmark report "$$f" --output $(BENCHMARK_OUTPUT)/reports/; \
+		done; \
+		echo "$(GREEN)Reports saved to $(BENCHMARK_OUTPUT)/reports/$(NC)"; \
+	else \
+		echo "$(RED)No experiment results found in $(BENCHMARK_OUTPUT)/$(NC)"; \
+		exit 1; \
+	fi
+
+benchmark-publication: ## Generate publication artifacts (tables, figures, stats)
+	@echo "$(BLUE)Generating publication artifacts...$(NC)"
+	$(RUN) benchmark publication all $(BENCHMARK_OUTPUT)/ --output $(BENCHMARK_OUTPUT)/publication/
+	@echo "$(GREEN)Publication artifacts saved to $(BENCHMARK_OUTPUT)/publication/$(NC)"
+
+benchmark-full-pipeline: docker-benchmark-all benchmark-report benchmark-publication ## Full pipeline: run benchmarks + generate all artifacts
+	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(GREEN)Full benchmark pipeline complete!$(NC)"
+	@echo "$(GREEN)Results: $(BENCHMARK_OUTPUT)/$(NC)"
+	@echo "$(GREEN)Reports: $(BENCHMARK_OUTPUT)/reports/$(NC)"
+	@echo "$(GREEN)Publication: $(BENCHMARK_OUTPUT)/publication/$(NC)"
+	@echo "$(GREEN)========================================$(NC)"
