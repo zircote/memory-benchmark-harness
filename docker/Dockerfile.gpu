@@ -51,9 +51,11 @@ COPY pyproject.toml uv.lock README.md ./
 
 # Create virtual environment and install dependencies
 # Note: PyTorch with CUDA support is large (~2GB) - this layer will be slow
+# Note: sqlite-vec 0.1.6 has broken ARM64 wheel (ELFCLASS32); 0.1.7a2 fixes it
 RUN uv venv /app/.venv && \
     . /app/.venv/bin/activate && \
     uv sync --frozen --no-dev && \
+    uv pip install --force-reinstall --prerelease=allow sqlite-vec && \
     # Install PyTorch with CUDA support for local embeddings
     uv pip install torch --index-url https://download.pytorch.org/whl/cu121 && \
     uv pip install sentence-transformers transformers
@@ -70,6 +72,10 @@ COPY --from=builder /app/.venv /app/.venv
 COPY src/ ./src/
 COPY config/ ./config/
 COPY main.py ./
+
+# Copy entrypoint script (initializes git repo for git-notes adapter)
+COPY docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Ensure the virtual environment is used
 ENV PATH="/app/.venv/bin:$PATH" \
@@ -90,8 +96,8 @@ RUN mkdir -p /app/.cache/huggingface
 HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=3 \
     CMD python -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'; print('OK')" || exit 1
 
-# Default entrypoint runs the benchmark CLI
-ENTRYPOINT ["python", "-m", "src.cli.main"]
+# Entrypoint initializes git repo (for git-notes adapter) and runs CLI
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # Default command shows help
 CMD ["--help"]

@@ -56,16 +56,30 @@ services:
       dockerfile: docker/Dockerfile.cpu
     image: benchmark-harness:cpu
     container_name: benchmark-harness-cpu
+    # Memory requirements for LongMemEval with git-notes adapter:
+    # - Embedding model: ~400MB
+    # - 200k embeddings (384-dim): ~300MB
+    # - SQLite index: ~200MB
+    # - Python overhead: ~500MB
+    # Total: ~1.5GB minimum, 4GB recommended
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
     volumes:
-    - ../data:/app/data:ro
+    - ../data:/app/data:rw
     - ../results:/app/results:rw
     - ../config:/app/config:ro
+    # Cache HuggingFace models to avoid re-downloading
+    - benchmark-cache:/app/.cache/huggingface
     environment:
     - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     - BENCHMARK_MODE=lite
-    # Disable GPU-dependent features
-    - DISABLE_LOCAL_EMBEDDINGS=1
+    # HuggingFace cache location (inside container)
+    - HF_HOME=/app/.cache/huggingface
     networks:
     - benchmark-net
     restart: no
@@ -100,7 +114,7 @@ services:
     networks:
     - benchmark-net
 
-  # Run tests in container
+  # Run unit tests in container (fast, no network)
   test:
     build:
       context: ..
@@ -110,14 +124,40 @@ services:
     volumes:
     - ../tests:/app/tests:ro
     - ../src:/app/src:ro
+    - ../pyproject.toml:/app/pyproject.toml:ro
+    - ../uv.lock:/app/uv.lock:ro
+    - ../README.md:/app/README.md:ro
     - test-results:/app/results
     environment:
     - PYTHONDONTWRITEBYTECODE=1
-    command: >
-      bash -c "
-        uv sync --frozen --dev;
-        pytest tests/ -v --tb=short --cov=src --cov-report=xml:/app/results/coverage.xml
-      "
+    entrypoint: ["bash", "-c"]
+    # Note: sqlite-vec 0.1.6 has broken ARM64 wheel; reinstall prerelease after uv sync
+    # Run only unit tests (not integration tests which require git repos)
+    command: ["uv sync --frozen --dev && uv pip install --force-reinstall --prerelease=allow sqlite-vec && pytest tests/unit/ -v --tb=short --cov=src --cov-report=xml:/app/results/coverage.xml"]
+    networks:
+    - benchmark-net
+
+  # Run e2e tests in container (requires network for dataset downloads)
+  test-e2e:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cpu
+    image: benchmark-harness:test-e2e
+    container_name: benchmark-harness-test-e2e
+    volumes:
+    - ../tests:/app/tests:ro
+    - ../src:/app/src:ro
+    - ../pyproject.toml:/app/pyproject.toml:ro
+    - ../uv.lock:/app/uv.lock:ro
+    - ../README.md:/app/README.md:ro
+    - ../data:/app/data:rw
+    - test-results:/app/results
+    environment:
+    - PYTHONDONTWRITEBYTECODE=1
+    - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    entrypoint: ["bash", "-c"]
+    # Note: sqlite-vec 0.1.6 has broken ARM64 wheel; reinstall prerelease after uv sync
+    command: ["uv sync --frozen --dev && uv pip install --force-reinstall --prerelease=allow sqlite-vec && pytest tests/ -v --tb=short -m e2e"]
     networks:
     - benchmark-net
 
