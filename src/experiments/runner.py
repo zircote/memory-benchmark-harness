@@ -25,6 +25,7 @@ from src.adapters.base import MemorySystemAdapter
 
 if TYPE_CHECKING:
     from src.evaluation.judge import LLMJudge
+    from src.evaluation.mock_judge import MockLLMJudge
 
 
 class AdapterCondition(Enum):
@@ -272,12 +273,24 @@ class ExperimentRunner:
                 )
         return self._adapter_factories[condition]()
 
-    def _get_or_create_judge(self) -> LLMJudge:
-        """Get existing judge or create a new one."""
-        if self._judge is None:
-            from src.evaluation.judge import LLMJudge
+    def _get_or_create_judge(self) -> LLMJudge | MockLLMJudge:
+        """Get existing judge or create a new one.
 
-            self._judge = LLMJudge()  # Uses OPENAI_API_KEY from env
+        Uses MockLLMJudge when the LLM client is a MockLLMClient,
+        otherwise creates a real LLMJudge that uses OpenAI API.
+        """
+        if self._judge is None:
+            # Check if we're using MockLLMClient by checking class name
+            # (avoids circular import by not importing MockLLMClient directly)
+            client_class = type(self.config.llm_client).__name__
+            if client_class == "MockLLMClient":
+                from src.evaluation.mock_judge import MockLLMJudge
+
+                self._judge = MockLLMJudge()  # type: ignore[assignment]
+            else:
+                from src.evaluation.judge import LLMJudge
+
+                self._judge = LLMJudge()  # Uses OPENAI_API_KEY from env
         return self._judge
 
     def _load_dataset(self) -> tuple[Any, str]:
@@ -378,6 +391,19 @@ class ExperimentRunner:
 
             # Create fresh adapter and pipeline for this trial
             adapter = self._create_adapter(condition)
+
+            # CRITICAL: Clear adapter index before each trial to prevent accumulation
+            # For git-notes adapters, multiple adapter instances share the same SQLite
+            # index (same repo path). Without clearing, each trial adds 200k messages
+            # on top of previous trials, causing memory to grow: 200k -> 400k -> 600k
+            clear_result = adapter.clear()
+            if not clear_result.success:
+                logger.warning(
+                    "Failed to clear adapter before trial %d: %s",
+                    trial_num,
+                    clear_result.error,
+                )
+
             pipeline = self._create_benchmark_pipeline(adapter)
 
             # Run the assessment (synchronous)
