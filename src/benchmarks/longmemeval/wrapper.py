@@ -220,15 +220,25 @@ class LongMemEvalAgent:
 
         return ingested_count
 
-    def ingest_all_sessions(self, sessions: list[LongMemEvalSession]) -> dict[str, int]:
+    def ingest_all_sessions(
+        self, sessions: list[LongMemEvalSession], *, use_batch: bool = True
+    ) -> dict[str, int]:
         """Ingest multiple sessions into memory.
 
         Args:
             sessions: List of sessions to ingest
+            use_batch: If True and adapter supports it, use batch ingestion (much faster)
 
         Returns:
             Dictionary mapping session_id to ingested message count
         """
+        # Check if adapter supports fast batch ingestion
+        has_batch = hasattr(self._adapter, "add_batch_fast") and use_batch
+
+        if has_batch:
+            return self._ingest_all_sessions_batch(sessions)
+
+        # Fallback to individual ingestion
         results: dict[str, int] = {}
         total_messages = 0
 
@@ -239,6 +249,73 @@ class LongMemEvalAgent:
 
         logger.info(f"Ingested {total_messages} messages from {len(sessions)} sessions")
         return results
+
+    def _ingest_all_sessions_batch(
+        self, sessions: list[LongMemEvalSession]
+    ) -> dict[str, int]:
+        """Ingest all sessions using optimized batch ingestion.
+
+        This is ~30-100x faster than individual ingestion for adapters
+        that support add_batch_fast() (e.g., GitNotesAdapter).
+
+        Args:
+            sessions: List of sessions to ingest
+
+        Returns:
+            Dictionary mapping session_id to ingested message count
+        """
+        # Collect all messages as (content, metadata) tuples
+        items: list[tuple[str, dict[str, Any]]] = []
+        session_counts: dict[str, int] = {s.session_id: 0 for s in sessions}
+
+        for session in sessions:
+            for idx, message in enumerate(session.messages):
+                content = f"{message.role}: {message.content}"
+                metadata: dict[str, Any] = {
+                    "session_id": session.session_id,
+                    "role": message.role,
+                    "message_index": idx,
+                    "namespace": "longmemeval",
+                }
+                if message.timestamp:
+                    metadata["timestamp"] = message.timestamp
+                if session.timestamp:
+                    metadata["session_timestamp"] = session.timestamp
+
+                items.append((content, metadata))
+                session_counts[session.session_id] += 1
+
+        logger.info(
+            f"Batch ingesting {len(items)} messages from {len(sessions)} sessions..."
+        )
+
+        # Use batch ingestion
+        results = self._adapter.add_batch_fast(  # type: ignore[attr-defined]
+            items,
+            batch_size=64,
+            show_progress=True,
+        )
+
+        # Count successful ingestions per session
+        success_counts: dict[str, int] = {s.session_id: 0 for s in sessions}
+        item_idx = 0
+        for session in sessions:
+            for _ in session.messages:
+                if results[item_idx].success:
+                    success_counts[session.session_id] += 1
+                item_idx += 1
+
+        # Track ingested sessions
+        for session in sessions:
+            self._ingested_sessions.add(session.session_id)
+
+        total_success = sum(success_counts.values())
+        logger.info(
+            f"Batch ingested {total_success}/{len(items)} messages "
+            f"from {len(sessions)} sessions"
+        )
+
+        return success_counts
 
     def answer_question(
         self,

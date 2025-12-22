@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
+import os
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 
+from src.clients import MockLLMClient, OpenAIClient
 from src.experiments.runner import (
     AdapterCondition,
     ExperimentConfig,
@@ -129,6 +130,27 @@ def run(
         )
         raise typer.Exit(1)
 
+    # Check for OpenAI API key
+    # When all adapters are 'mock', we can use a mock LLM client for testing
+    use_mock_llm = all(a == AdapterCondition.MOCK for a in adapters)
+
+    if not os.environ.get("OPENAI_API_KEY") and not use_mock_llm:
+        typer.echo(
+            "Error: OPENAI_API_KEY environment variable is required for running experiments.",
+            err=True,
+        )
+        typer.echo("Set it with: export OPENAI_API_KEY=your-api-key", err=True)
+        typer.echo("Tip: Use '--adapter mock' to run without an API key.", err=True)
+        raise typer.Exit(1)
+
+    # Create LLM client - use mock when testing with mock adapter only
+    # This allows testing the pipeline without making real API calls
+    if use_mock_llm:
+        typer.echo("Note: Using mock LLM client (all adapters are 'mock')")
+        llm_client: MockLLMClient | OpenAIClient = MockLLMClient()
+    else:
+        llm_client = OpenAIClient()
+
     # Create config
     config = ExperimentConfig(
         benchmark=benchmark,
@@ -137,6 +159,7 @@ def run(
         base_seed=seed,
         output_dir=output_dir,
         dataset_path=dataset,
+        llm_client=llm_client,
         progress_callback=None if quiet else _progress_callback,
     )
 
@@ -149,7 +172,29 @@ def run(
 
     # Run experiment
     runner = ExperimentRunner(config)
-    results: ExperimentResults = asyncio.run(runner.run())  # type: ignore[arg-type]
+
+    # Register GitNotesAdapter factory if git-notes adapter is requested
+    if AdapterCondition.GIT_NOTES in adapters:
+        try:
+            # Verify the actual git-notes-memory-manager package is installed
+            import git_notes_memory  # noqa: F401
+
+            from src.adapters.git_notes import GitNotesAdapter
+
+            runner.register_adapter_factory(
+                AdapterCondition.GIT_NOTES,
+                lambda: GitNotesAdapter(),
+            )
+        except ImportError as e:
+            typer.echo(
+                "Error: git-notes adapter requires git-notes-memory-manager package.",
+                err=True,
+            )
+            typer.echo(f"  {e}", err=True)
+            typer.echo("Install it with: uv add git-notes-memory-manager", err=True)
+            raise typer.Exit(1) from e
+
+    results: ExperimentResults = runner.run()
 
     # Report results
     typer.echo()

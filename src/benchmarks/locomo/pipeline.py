@@ -24,6 +24,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from src.evaluation.judge import Judgment
+
 if TYPE_CHECKING:
     from src.adapters.base import MemorySystemAdapter
     from src.benchmarks.locomo.dataset import (
@@ -37,7 +39,7 @@ if TYPE_CHECKING:
         LoCoMoAgent,
         LoCoMoAnswer,
     )
-    from src.evaluation.judge import Judgment, LLMJudge
+    from src.evaluation.judge import LLMJudge
 
 logger = logging.getLogger(__name__)
 
@@ -400,7 +402,7 @@ class LoCoMoPipeline:
             logger.info(f"Assessing all {len(all_questions)} questions")
 
         # Phase 3: Answer all questions
-        logger.info("Answering questions...")
+        logger.info(f"Answering {len(all_questions)} questions (this may take several minutes)...")
         answers_with_timing: list[tuple[LoCoMoAnswer, float]] = []
 
         for idx, question in enumerate(all_questions):
@@ -414,31 +416,49 @@ class LoCoMoPipeline:
             if progress_callback:
                 progress_callback(idx + 1, len(all_questions))
 
-            if (idx + 1) % 50 == 0:
-                logger.debug(f"Answered {idx + 1}/{len(all_questions)} questions")
+            # Log progress every 10 questions at INFO level for visibility
+            if (idx + 1) % 10 == 0 or idx == 0:
+                logger.info(
+                    f"  Answered {idx + 1}/{len(all_questions)} questions "
+                    f"({(idx + 1) / len(all_questions) * 100:.0f}%) - last: {answer_time_ms:.0f}ms"
+                )
 
         logger.info(f"Answered {len(answers_with_timing)} questions")
 
         # Phase 4: Assess answers using LLM-as-Judge
-        logger.info("Assessing answers with LLM-as-Judge...")
+        logger.info(
+            f"Judging {len(all_questions)} answers with LLM-as-Judge "
+            "(this may take several minutes)..."
+        )
         judge_start = time.perf_counter()
 
-        # Prepare batch for judging
-        judge_tuples: list[tuple[str, str, str]] = []
-        for (answer, _), question in zip(answers_with_timing, all_questions, strict=True):
+        # Judge each answer with progress logging
+        judgments: list[Judgment] = []
+        for idx, ((answer, _), question) in enumerate(
+            zip(answers_with_timing, all_questions, strict=True)
+        ):
             # For adversarial questions, use the adversarial_answer as "correct"
-            # but judge differently (looking for premise identification)
             if question.is_adversarial and question.adversarial_answer:
                 reference = question.adversarial_answer
             else:
                 reference = question.answer
-            judge_tuples.append((question.question, reference, answer.answer))
 
-        # Batch judge all answers
-        judgments = self._judge.batch_judge(judge_tuples, skip_cache=skip_cache)
+            judgment = self._judge.judge(
+                question.question, reference, answer.answer, skip_cache=skip_cache
+            )
+            judgments.append(judgment)
+
+            # Log progress every 10 judgments
+            if (idx + 1) % 10 == 0 or idx == 0:
+                elapsed = (time.perf_counter() - judge_start) * 1000
+                logger.info(
+                    f"  Judged {idx + 1}/{len(all_questions)} answers "
+                    f"({(idx + 1) / len(all_questions) * 100:.0f}%) - "
+                    f"elapsed: {elapsed / 1000:.1f}s"
+                )
 
         judge_time_ms = (time.perf_counter() - judge_start) * 1000
-        logger.info(f"Judged {len(judgments)} answers in {judge_time_ms:.1f}ms")
+        logger.info(f"Judged {len(judgments)} answers in {judge_time_ms / 1000:.1f}s")
 
         # Phase 5: Build question results
         question_results: list[QuestionResult] = []

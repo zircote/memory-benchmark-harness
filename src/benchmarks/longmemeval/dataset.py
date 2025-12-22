@@ -253,92 +253,51 @@ def _parse_question(raw: dict[str, Any]) -> LongMemEvalQuestion:
 def load_longmemeval(
     subset: str = "S",
     cache_dir: Path | str | None = None,
+    force_download: bool = False,
 ) -> LongMemEvalDataset:
-    """Load the benchmark dataset from HuggingFace.
+    """Load the benchmark dataset, downloading if necessary.
+
+    Downloads the dataset from HuggingFace if not already cached locally.
+    This avoids PyArrow parsing issues with the HuggingFace datasets library.
 
     Args:
         subset: Which subset to load - 'S' (small, ~40 sessions) or 'M' (medium, ~500 sessions)
-        cache_dir: Optional cache directory for HuggingFace datasets
+        cache_dir: Directory to cache the dataset. Defaults to data/longmemeval/
+        force_download: If True, re-download even if cached
 
     Returns:
         LongMemEvalDataset with parsed sessions and questions
 
     Raises:
         ValueError: If subset is not 'S' or 'M'
-        ImportError: If datasets library is not installed
+        RuntimeError: If download fails
     """
+    import urllib.error
+    import urllib.request
+
     if subset not in ("S", "M"):
         raise ValueError(f"subset must be 'S' or 'M', got {subset}")
 
-    try:
-        from datasets import load_dataset
-    except ImportError as e:
-        raise ImportError(
-            "The 'datasets' library is required. Install it with: pip install datasets"
-        ) from e
+    cache_path = Path("data/longmemeval") if cache_dir is None else Path(cache_dir)
+    cache_path.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Loading LongMemEval {subset} subset from HuggingFace...")
+    # Map subset to filename
+    filename = f"longmemeval_{subset.lower()}_cleaned.json"
+    cache_file = cache_path / filename
 
-    # Load the dataset
-    dataset_name = "xiaowu0162/longmemeval-cleaned"
-    kwargs: dict[str, Any] = {}
-    if cache_dir:
-        kwargs["cache_dir"] = str(cache_dir)
+    if not cache_file.exists() or force_download:
+        # Download from HuggingFace direct URL (bypasses datasets library PyArrow issues)
+        base_url = "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned"
+        url = f"{base_url}/resolve/main/{filename}"
+        logger.info(f"Downloading {subset} subset from {url}...")
 
-    try:
-        ds = load_dataset(dataset_name, **kwargs)
-    except Exception as e:
-        logger.error(f"Failed to load dataset: {e}")
-        raise
+        try:
+            urllib.request.urlretrieve(url, cache_file)
+            logger.info(f"Downloaded to {cache_file}")
+        except urllib.error.URLError as e:
+            raise RuntimeError(f"Failed to download dataset: {e}") from e
 
-    # The dataset has different files for S and M subsets
-    # File names: longmemeval_s_cleaned.json, longmemeval_m_cleaned.json
-    file_key = f"longmemeval_{subset.lower()}_cleaned"
-
-    # Extract sessions and questions from the dataset
-    sessions: list[LongMemEvalSession] = []
-    questions: list[LongMemEvalQuestion] = []
-
-    # The dataset structure may vary - handle both possible formats
-    if file_key in ds:
-        data = ds[file_key]
-    elif "train" in ds:
-        # Some HF datasets use 'train' as default split
-        data = ds["train"]
-    else:
-        # Try to get the first available split
-        available_splits = list(ds.keys())
-        if not available_splits:
-            raise ValueError(f"Dataset has no available splits: {dataset_name}")
-        logger.warning(f"Using first available split: {available_splits[0]}")
-        data = ds[available_splits[0]]
-
-    # Parse each row - structure depends on dataset format
-    for idx, row in enumerate(data):
-        row_dict = dict(row)
-
-        # Check if this row contains sessions or questions
-        if "messages" in row_dict or "session_id" in row_dict:
-            sessions.append(_parse_session(row_dict))
-        if "question" in row_dict or "query" in row_dict:
-            if "question_id" not in row_dict:
-                row_dict["question_id"] = f"q_{idx}"
-            questions.append(_parse_question(row_dict))
-
-    logger.info(
-        f"Loaded LongMemEval {subset}: {len(sessions)} sessions, {len(questions)} questions"
-    )
-
-    return LongMemEvalDataset(
-        subset=subset,
-        sessions=sessions,
-        questions=questions,
-        metadata={
-            "source": dataset_name,
-            "loaded_at": datetime.now().isoformat(),
-            "cache_dir": str(cache_dir) if cache_dir else None,
-        },
-    )
+    return load_longmemeval_from_file(cache_file, subset=subset)
 
 
 def load_longmemeval_from_file(
