@@ -33,6 +33,12 @@ dev = [
     "ruff>=0.1.0",
     "pre-commit>=3.4.0",
 ]
+publication = [
+    "matplotlib>=3.7.0",
+]
+all = [
+    "memory-benchmark-harness[dev,publication]",
+]
 
 [project.scripts]
 benchmark = "src.cli.main:app"

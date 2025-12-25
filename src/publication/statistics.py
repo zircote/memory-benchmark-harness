@@ -12,6 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+from scipy import stats
+
 from src.evaluation.statistics import StatisticalAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -125,6 +128,8 @@ class PublicationStatistics:
     ) -> BenchmarkSummary | None:
         """Load results from a JSON file.
 
+        Handles both flat result format and nested experiment format with trials.
+
         Args:
             filepath: Path to results file
             benchmark_name: Name of the benchmark
@@ -142,14 +147,27 @@ class PublicationStatistics:
             with open(filepath) as f:
                 data = json.load(f)
 
-            # Extract metrics based on common result formats
-            metrics = self._extract_metrics(data)
-            category_metrics = self._extract_category_metrics(data)
+            # Handle nested experiment format: trials.{adapter}[].metrics
+            if "trials" in data and adapter_name in data["trials"]:
+                trials = data["trials"][adapter_name]
+                successful = [t for t in trials if t.get("success", True)]
 
-            total_samples = data.get("total_samples", 0)
-            if not total_samples:
-                # Try alternative field names
-                total_samples = data.get("num_samples", data.get("count", 0))
+                if not successful:
+                    logger.warning(f"No successful trials for {adapter_name} in {filepath}")
+                    return None
+
+                # Aggregate metrics across trials (use last trial or average)
+                metrics_data = self._aggregate_trial_metrics(successful)
+                metrics = self._extract_metrics(metrics_data)
+                category_metrics = self._extract_category_metrics(metrics_data)
+                total_samples = metrics_data.get("total_questions", 0)
+            else:
+                # Flat format - metrics at top level
+                metrics = self._extract_metrics(data)
+                category_metrics = self._extract_category_metrics(data)
+                total_samples = data.get("total_samples", 0)
+                if not total_samples:
+                    total_samples = data.get("num_samples", data.get("count", 0))
 
             summary = BenchmarkSummary(
                 benchmark_name=benchmark_name,
@@ -166,6 +184,57 @@ class PublicationStatistics:
         except Exception as e:
             logger.warning(f"Failed to load results from {filepath}: {e}")
             return None
+
+    def _aggregate_trial_metrics(self, trials: list[dict[str, Any]]) -> dict[str, Any]:
+        """Aggregate metrics across multiple trials.
+
+        For multiple trials, computes the mean of each metric.
+
+        Args:
+            trials: List of trial result dictionaries
+
+        Returns:
+            Aggregated metrics dictionary
+        """
+        if not trials:
+            return {}
+
+        if len(trials) == 1:
+            # Single trial - return its metrics directly
+            return trials[0].get("metrics", {})
+
+        # Multiple trials - compute averages
+        all_metrics = [t.get("metrics", {}) for t in trials]
+
+        aggregated: dict[str, Any] = {}
+        metric_keys = ["accuracy", "mean_score", "precision", "recall", "f1_score",
+                       "abstention_rate", "adversarial_accuracy"]
+
+        for key in metric_keys:
+            values = [m.get(key, 0.0) for m in all_metrics if key in m]
+            if values:
+                aggregated[key] = sum(values) / len(values)
+
+        # Aggregate total_questions
+        total_q = sum(m.get("total_questions", 0) for m in all_metrics)
+        if total_q:
+            aggregated["total_questions"] = total_q
+
+        # Aggregate category accuracies
+        cat_keys: set[str] = set()
+        for m in all_metrics:
+            cat_keys.update(m.get("category_accuracies", {}).keys())
+
+        if cat_keys:
+            aggregated["category_accuracies"] = {}
+            for cat in cat_keys:
+                cat_values = [m.get("category_accuracies", {}).get(cat, 0.0)
+                              for m in all_metrics
+                              if cat in m.get("category_accuracies", {})]
+                if cat_values:
+                    aggregated["category_accuracies"][cat] = sum(cat_values) / len(cat_values)
+
+        return aggregated
 
     def _extract_metrics(self, data: dict[str, Any]) -> UnifiedMetrics:
         """Extract unified metrics from result data.
@@ -297,6 +366,9 @@ class PublicationStatistics:
     ) -> dict[str, Any]:
         """Compare two adapters statistically.
 
+        Uses paired t-test when sample sizes match, independent t-test
+        (Welch's) when they differ.
+
         Args:
             adapter_a: First adapter name
             adapter_b: Second adapter name
@@ -313,16 +385,46 @@ class PublicationStatistics:
                 "error": "Insufficient data for comparison",
             }
 
-        # Collect accuracy scores by benchmark
-        scores_a = [s.metrics.accuracy for s in summaries_a]
-        scores_b = [s.metrics.accuracy for s in summaries_b]
+        # Collect accuracy scores
+        scores_a = np.array([s.metrics.accuracy for s in summaries_a])
+        scores_b = np.array([s.metrics.accuracy for s in summaries_b])
 
-        mean_a = sum(scores_a) / len(scores_a)
-        mean_b = sum(scores_b) / len(scores_b)
+        mean_a = float(np.mean(scores_a))
+        mean_b = float(np.mean(scores_b))
         mean_diff = mean_a - mean_b
 
-        # Paired comparison if same benchmarks
-        result = self.analyzer.paired_comparison(scores_a, scores_b)
+        # Need at least 2 samples per group for statistical tests
+        if len(scores_a) < 2 or len(scores_b) < 2:
+            return {
+                "valid": False,
+                "error": f"Insufficient samples: {len(scores_a)} and {len(scores_b)} (need >= 2 each)",
+            }
+
+        # Choose test based on sample sizes
+        if len(scores_a) == len(scores_b):
+            # Paired t-test when lengths match
+            result = self.analyzer.paired_comparison(scores_a, scores_b)
+            p_value = result.p_value
+            effect_size = result.effect_size
+            is_significant = result.is_significant
+            test_type = "paired"
+        else:
+            # Independent t-test (Welch's) when lengths differ
+            _, p_value = stats.ttest_ind(scores_a, scores_b, equal_var=False)
+
+            # Handle NaN p-value
+            if np.isnan(p_value):
+                p_value = 1.0
+
+            # Cohen's d for independent samples
+            pooled_std = np.sqrt(
+                ((len(scores_a) - 1) * np.var(scores_a, ddof=1)
+                 + (len(scores_b) - 1) * np.var(scores_b, ddof=1))
+                / (len(scores_a) + len(scores_b) - 2)
+            )
+            effect_size = mean_diff / pooled_std if pooled_std > 0 else 0.0
+            is_significant = p_value < self.analyzer.alpha
+            test_type = "independent"
 
         return {
             "valid": True,
@@ -331,9 +433,12 @@ class PublicationStatistics:
             "mean_a": mean_a,
             "mean_b": mean_b,
             "mean_diff": mean_diff,
-            "p_value": result.p_value,
-            "effect_size": result.effect_size,
-            "significant": result.is_significant,
+            "p_value": float(p_value),
+            "effect_size": float(effect_size),
+            "significant": is_significant,
+            "test_type": test_type,
+            "n_a": len(scores_a),
+            "n_b": len(scores_b),
         }
 
     def get_main_results_data(self) -> list[dict[str, Any]]:

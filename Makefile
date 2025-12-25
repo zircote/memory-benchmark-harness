@@ -14,12 +14,14 @@ ifdef UV
 	RUN := uv run
 	INSTALL := uv sync
 	INSTALL_DEV := uv sync --all-groups
+	INSTALL_PUB := uv pip install -e ".[publication]"
 	PYTHON := uv run python
 else
 	PKG_MGR := pip
 	RUN :=
 	INSTALL := pip install -e .
 	INSTALL_DEV := pip install -e ".[dev]"
+	INSTALL_PUB := pip install -e ".[publication]"
 	PYTHON := python
 endif
 
@@ -255,6 +257,8 @@ benchmark-report: ## Generate reports from benchmark results
 	fi
 
 benchmark-publication: ## Generate publication artifacts (tables, figures, stats)
+	@echo "$(BLUE)Ensuring publication dependencies are installed...$(NC)"
+	@$(INSTALL_PUB) > /dev/null 2>&1 || $(INSTALL_PUB)
 	@echo "$(BLUE)Generating publication artifacts...$(NC)"
 	$(RUN) benchmark publication all $(BENCHMARK_OUTPUT)/ --output $(BENCHMARK_OUTPUT)/publication/
 	@echo "$(GREEN)Publication artifacts saved to $(BENCHMARK_OUTPUT)/publication/$(NC)"
