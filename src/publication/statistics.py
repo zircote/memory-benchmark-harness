@@ -103,6 +103,7 @@ class PublicationStatistics:
     summaries: list[BenchmarkSummary] = field(default_factory=list)
     ablation_results: list[AblationResult] = field(default_factory=list)
     analyzer: StatisticalAnalyzer = field(default_factory=StatisticalAnalyzer)
+    adapter_versions: dict[str, str] = field(default_factory=dict)
 
     def add_summary(self, summary: BenchmarkSummary) -> None:
         """Add a benchmark summary.
@@ -168,6 +169,13 @@ class PublicationStatistics:
                 total_samples = data.get("total_samples", 0)
                 if not total_samples:
                     total_samples = data.get("num_samples", data.get("count", 0))
+
+            # Extract adapter versions from config if present
+            config = data.get("config", {})
+            versions = config.get("adapter_versions", {})
+            for adapter, version in versions.items():
+                if adapter not in self.adapter_versions:
+                    self.adapter_versions[adapter] = version
 
             summary = BenchmarkSummary(
                 benchmark_name=benchmark_name,
@@ -537,6 +545,7 @@ class PublicationStatistics:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         data = {
+            "adapter_versions": self.adapter_versions,
             "main_results": self.get_main_results_data(),
             "ablation": self.get_ablation_data(),
             "category_breakdown": self.get_category_data(),

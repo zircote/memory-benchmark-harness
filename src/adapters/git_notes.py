@@ -543,6 +543,22 @@ class GitNotesAdapter(MemorySystemAdapter):
                 "error": str(e),
             }
 
+    def get_version(self) -> str | None:
+        """Get the installed git-notes-memory-manager version.
+
+        Uses importlib.metadata to retrieve the package version,
+        enabling cross-version performance comparisons.
+
+        Returns:
+            Version string (e.g., "0.8.1") or None if unavailable
+        """
+        import importlib.metadata
+
+        try:
+            return importlib.metadata.version("git-notes-memory")
+        except importlib.metadata.PackageNotFoundError:
+            return None
+
     def reindex(self, full: bool = False) -> int:
         """Rebuild the index from git notes.
 

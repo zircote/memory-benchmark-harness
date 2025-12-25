@@ -175,3 +175,14 @@ class MemorySystemAdapter(ABC):
                 - index_status: Embedding index status
         """
         ...
+
+    def get_version(self) -> str | None:
+        """Get the version of the underlying memory system.
+
+        Override in adapters that wrap versioned external libraries
+        to enable cross-version performance tracking.
+
+        Returns:
+            Version string (e.g., "0.8.1") or None if not applicable
+        """
+        return None

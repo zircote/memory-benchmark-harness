@@ -502,6 +502,18 @@ class ExperimentRunner:
         import uuid
 
         experiment_id = f"exp_{self.config.benchmark}_{uuid.uuid4().hex[:8]}"
+
+        # Capture adapter versions for cross-version comparison
+        adapter_versions: dict[str, str] = {}
+        for condition in self.config.adapters:
+            try:
+                adapter = self._create_adapter(condition)
+                version = adapter.get_version()
+                if version:
+                    adapter_versions[condition.value] = version
+            except Exception:
+                pass  # Adapter creation may fail if not configured
+
         results = ExperimentResults(
             experiment_id=experiment_id,
             benchmark=self.config.benchmark,
@@ -510,6 +522,7 @@ class ExperimentRunner:
                 "num_trials": self.config.num_trials,
                 "base_seed": self.config.base_seed,
                 "dataset_path": self.config.dataset_path,
+                "adapter_versions": adapter_versions,
             },
             started_at=datetime.now(UTC).isoformat(),
         )

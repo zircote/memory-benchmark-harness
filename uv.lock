@@ -715,7 +715,7 @@ http = [
 
 [[package]]
 name = "git-notes-memory"
-version = "0.8.0"
+version = "0.9.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "python-dotenv" },
@@ -723,9 +723,9 @@ dependencies = [
     { name = "sentence-transformers" },
     { name = "sqlite-vec" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9f/6e/9b86a8eb527477ca2630f4984356a80fa930c241c0b6894315b51c64d32b/git_notes_memory-0.8.0.tar.gz", hash = "sha256:8f037b022e2d3c084237d373eff0af3fec69a49a50a60c56f71a804f62666f4a", size = 123333, upload-time = "2025-12-22T00:04:08.996Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/17/d9/b99a1b89c1ed1a8f3f00d895c68abdec4905f1f5967d60c15724e225066b/git_notes_memory-0.9.1.tar.gz", hash = "sha256:b9752941f4909c533717b911aac5acecaf78c4b6cfc831a838ed2474b7b1738b", size = 128519, upload-time = "2025-12-24T16:56:27.148Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/df/704309f7fd1c38c5b489ca8adb4092c1475839d28f631136754a8fb34fe0/git_notes_memory-0.8.0-py3-none-any.whl", hash = "sha256:35ba2de052ad2f4813c97f4d5f228f4ecf2783048c0685eccc7af8136de151f9", size = 146802, upload-time = "2025-12-22T00:04:07.688Z" },
+    { url = "https://files.pythonhosted.org/packages/64/3a/7ba8270af8a13ea1d19e38c11e10cb564cec11f5be81539ccc76b973f94f/git_notes_memory-0.9.1-py3-none-any.whl", hash = "sha256:b6d3fa2bcaa839f2b53dc666f6c05cb2d450fa622553c8881e5875dbc47f7de7", size = 152593, upload-time = "2025-12-24T16:56:25.724Z" },
 ]
 
 [[package]]
@@ -1313,7 +1313,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.40.0" },
     { name = "datasets", specifier = ">=2.14.0" },
-    { name = "git-notes-memory", specifier = ">=0.8.0" },
+    { name = "git-notes-memory", specifier = ">=0.9.1" },
     { name = "httpx", specifier = ">=0.25.0" },
     { name = "matplotlib", marker = "extra == 'publication'", specifier = ">=3.7.0" },
     { name = "memory-benchmark-harness", extras = ["dev", "publication"], marker = "extra == 'all'" },
