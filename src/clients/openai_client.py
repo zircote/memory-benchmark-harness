@@ -109,6 +109,34 @@ class OpenAIClient:
             usage=usage,
         )
 
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,  # noqa: ARG002
+    ) -> str:
+        """Generate a response (alternative interface).
+
+        Some benchmark agents use generate() instead of complete().
+
+        Args:
+            prompt: User prompt
+            system_prompt: Optional system prompt
+            max_tokens: Maximum tokens (ignored, uses instance default)
+
+        Returns:
+            Generated response string
+        """
+        system = system_prompt or "You are a helpful assistant."
+        messages = [{"role": "user", "content": prompt}]
+
+        response = self.complete(
+            system=system,
+            messages=messages,
+            temperature=0.0,
+        )
+        return response.content
+
     @property
     def call_count(self) -> int:
         """Number of API calls made."""
