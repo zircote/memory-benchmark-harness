@@ -57,9 +57,11 @@ COPY main.py ./
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Ensure the virtual environment is used
+# Ensure the virtual environment is used and set cache locations
 ENV PATH="/app/.venv/bin:$PATH" \
-    VIRTUAL_ENV="/app/.venv"
+    VIRTUAL_ENV="/app/.venv" \
+    HF_HOME="/app/.cache/huggingface" \
+    SENTENCE_TRANSFORMERS_HOME="/app/.cache/huggingface"
 
 # Create directories for data and results (will be mounted as volumes)
 RUN mkdir -p /app/data /app/results

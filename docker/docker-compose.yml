@@ -82,6 +82,8 @@ services:
     - BENCHMARK_MODE=lite
     # HuggingFace cache location (inside container)
     - HF_HOME=/app/.cache/huggingface
+    # Sentence-transformers cache (used by git-notes-memory embeddings)
+    - SENTENCE_TRANSFORMERS_HOME=/app/.cache/huggingface
     networks:
     - benchmark-net
     restart: no
