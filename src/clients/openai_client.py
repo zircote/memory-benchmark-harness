@@ -87,13 +87,18 @@ class OpenAIClient:
         all_messages.extend(messages)
 
         # Call OpenAI API
-        # Use max_completion_tokens (gpt-5 models require this instead of max_tokens)
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=all_messages,  # type: ignore[arg-type]
-            temperature=temperature,
-            max_completion_tokens=self.max_tokens,
-        )
+        # Build kwargs - gpt-5 models have restrictions on temperature and max_tokens
+        create_kwargs: dict[str, Any] = {
+            "model": self.model,
+            "messages": all_messages,
+            "max_completion_tokens": self.max_tokens,
+        }
+
+        # gpt-5 models only support temperature=1 (default), so skip the parameter
+        if not self.model.startswith("gpt-5"):
+            create_kwargs["temperature"] = temperature
+
+        response = self.client.chat.completions.create(**create_kwargs)  # type: ignore[arg-type]
 
         content = response.choices[0].message.content or ""
         usage = {}

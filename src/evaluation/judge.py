@@ -426,14 +426,19 @@ class LLMJudge:
                 start_time = time.monotonic()
                 self._call_count += 1
 
-                # Use max_completion_tokens (gpt-5 models require this instead of max_tokens)
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[{"role": "user", "content": prompt}],
-                    temperature=self.temperature,
-                    max_completion_tokens=self.max_tokens,
-                    response_format={"type": "json_object"},
-                )
+                # Build kwargs - gpt-5 models have restrictions on temperature and max_tokens
+                create_kwargs: dict[str, Any] = {
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_completion_tokens": self.max_tokens,
+                    "response_format": {"type": "json_object"},
+                }
+
+                # gpt-5 models only support temperature=1 (default), so skip the parameter
+                if not self.model.startswith("gpt-5"):
+                    create_kwargs["temperature"] = self.temperature
+
+                response = self.client.chat.completions.create(**create_kwargs)
 
                 elapsed = time.monotonic() - start_time
                 content = response.choices[0].message.content
