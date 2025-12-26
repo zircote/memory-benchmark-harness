@@ -52,6 +52,7 @@ class BenchmarkSummary:
     Attributes:
         benchmark_name: Name of the benchmark
         adapter_name: Name of the adapter/condition
+        adapter_version: Version of the adapter library (if applicable)
         total_samples: Total samples evaluated
         metrics: Unified metrics for this benchmark
         category_metrics: Per-category metrics if applicable
@@ -62,6 +63,7 @@ class BenchmarkSummary:
     adapter_name: str
     total_samples: int
     metrics: UnifiedMetrics
+    adapter_version: str | None = None
     category_metrics: dict[str, UnifiedMetrics] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -173,6 +175,7 @@ class PublicationStatistics:
             # Extract adapter versions from config if present
             config = data.get("config", {})
             versions = config.get("adapter_versions", {})
+            adapter_version = versions.get(adapter_name)
             for adapter, version in versions.items():
                 if adapter not in self.adapter_versions:
                     self.adapter_versions[adapter] = version
@@ -182,6 +185,7 @@ class PublicationStatistics:
                 adapter_name=adapter_name,
                 total_samples=total_samples,
                 metrics=metrics,
+                adapter_version=adapter_version,
                 category_metrics=category_metrics,
                 metadata=data.get("metadata", {}),
             )
@@ -215,8 +219,15 @@ class PublicationStatistics:
         all_metrics = [t.get("metrics", {}) for t in trials]
 
         aggregated: dict[str, Any] = {}
-        metric_keys = ["accuracy", "mean_score", "precision", "recall", "f1_score",
-                       "abstention_rate", "adversarial_accuracy"]
+        metric_keys = [
+            "accuracy",
+            "mean_score",
+            "precision",
+            "recall",
+            "f1_score",
+            "abstention_rate",
+            "adversarial_accuracy",
+        ]
 
         for key in metric_keys:
             values = [m.get(key, 0.0) for m in all_metrics if key in m]
@@ -236,9 +247,11 @@ class PublicationStatistics:
         if cat_keys:
             aggregated["category_accuracies"] = {}
             for cat in cat_keys:
-                cat_values = [m.get("category_accuracies", {}).get(cat, 0.0)
-                              for m in all_metrics
-                              if cat in m.get("category_accuracies", {})]
+                cat_values = [
+                    m.get("category_accuracies", {}).get(cat, 0.0)
+                    for m in all_metrics
+                    if cat in m.get("category_accuracies", {})
+                ]
                 if cat_values:
                     aggregated["category_accuracies"][cat] = sum(cat_values) / len(cat_values)
 
@@ -426,8 +439,10 @@ class PublicationStatistics:
 
             # Cohen's d for independent samples
             pooled_std = np.sqrt(
-                ((len(scores_a) - 1) * np.var(scores_a, ddof=1)
-                 + (len(scores_b) - 1) * np.var(scores_b, ddof=1))
+                (
+                    (len(scores_a) - 1) * np.var(scores_a, ddof=1)
+                    + (len(scores_b) - 1) * np.var(scores_b, ddof=1)
+                )
                 / (len(scores_a) + len(scores_b) - 2)
             )
             effect_size = mean_diff / pooled_std if pooled_std > 0 else 0.0
@@ -452,19 +467,24 @@ class PublicationStatistics:
     def get_main_results_data(self) -> list[dict[str, Any]]:
         """Get data for main results table.
 
+        Groups by adapter and version for cross-version comparison.
+
         Returns:
             List of row data for main results table
         """
-        # Group by adapter
-        by_adapter: dict[str, list[BenchmarkSummary]] = {}
+        # Group by adapter+version tuple
+        by_adapter_version: dict[tuple[str, str | None], list[BenchmarkSummary]] = {}
         for s in self.summaries:
-            if s.adapter_name not in by_adapter:
-                by_adapter[s.adapter_name] = []
-            by_adapter[s.adapter_name].append(s)
+            key = (s.adapter_name, s.adapter_version)
+            if key not in by_adapter_version:
+                by_adapter_version[key] = []
+            by_adapter_version[key].append(s)
 
         results = []
-        for adapter, summaries in sorted(by_adapter.items()):
-            aggregate = self.compute_aggregate_metrics(adapter)
+        for (adapter, version), summaries in sorted(by_adapter_version.items()):
+            # Compute aggregate across all benchmarks for this adapter+version
+            accuracies = [s.metrics.accuracy for s in summaries]
+            avg_accuracy = sum(accuracies) / len(accuracies) if accuracies else 0.0
 
             # Per-benchmark accuracies
             benchmarks = {s.benchmark_name: s.metrics.accuracy for s in summaries}
@@ -472,9 +492,10 @@ class PublicationStatistics:
             results.append(
                 {
                     "adapter": adapter,
-                    "overall_accuracy": aggregate.accuracy,
-                    "f1_score": aggregate.f1_score,
-                    "abstention_rate": aggregate.abstention_rate,
+                    "version": version,
+                    "overall_accuracy": avg_accuracy,
+                    "f1_score": 0.0,  # TODO: compute aggregate F1
+                    "abstention_rate": 0.0,
                     "benchmarks": benchmarks,
                 }
             )
@@ -553,6 +574,7 @@ class PublicationStatistics:
                 {
                     "benchmark": s.benchmark_name,
                     "adapter": s.adapter_name,
+                    "adapter_version": s.adapter_version,
                     "total_samples": s.total_samples,
                     "accuracy": s.metrics.accuracy,
                     "accuracy_ci": s.metrics.accuracy_ci,

@@ -54,7 +54,7 @@ def run(
     benchmark: Annotated[
         str,
         typer.Argument(
-            help="Benchmark to run: 'longmemeval' or 'locomo'",
+            help="Benchmark to run: 'longmemeval', 'locomo', 'contextbench', or 'memoryagentbench'",
         ),
     ],
     adapter: Annotated[
@@ -121,7 +121,7 @@ def run(
         raise typer.Exit(1) from e
 
     # Validate benchmark
-    valid_benchmarks = {"longmemeval", "locomo"}
+    valid_benchmarks = {"longmemeval", "locomo", "contextbench", "memoryagentbench"}
     if benchmark not in valid_benchmarks:
         typer.echo(
             f"Error: Invalid benchmark '{benchmark}'. "
@@ -209,15 +209,9 @@ def run(
     for condition, trial_list in results.trials.items():
         successful = [t for t in trial_list if t.success]
         if successful:
-            # Get average metrics
-            if benchmark == "longmemeval":
-                avg_acc = sum(t.metrics.get("accuracy", 0) for t in successful) / len(successful)
-                typer.echo(f"  {condition}: avg accuracy = {avg_acc:.2%}")
-            elif benchmark == "locomo":
-                avg_acc = sum(t.metrics.get("overall_accuracy", 0) for t in successful) / len(
-                    successful
-                )
-                typer.echo(f"  {condition}: avg overall accuracy = {avg_acc:.2%}")
+            # Get average metrics - use 'accuracy' key which is common across benchmarks
+            avg_acc = sum(t.metrics.get("accuracy", 0) for t in successful) / len(successful)
+            typer.echo(f"  {condition}: avg accuracy = {avg_acc:.2%}")
         else:
             typer.echo(f"  {condition}: all trials failed")
 
@@ -232,14 +226,23 @@ def list_benchmarks() -> None:
     """List available benchmarks."""
     typer.echo("Available benchmarks:")
     typer.echo()
-    typer.echo("  longmemeval  - LongMemEval: Long-term memory QA (HuggingFace)")
-    typer.echo("                 Tests single-session and multi-session memory")
-    typer.echo("                 Question types: factoid, reasoning, temporal")
+    typer.echo("  longmemeval      - LongMemEval: Long-term memory QA (HuggingFace)")
+    typer.echo("                     Tests single-session and multi-session memory")
+    typer.echo("                     Question types: factoid, reasoning, temporal")
     typer.echo()
-    typer.echo("  locomo       - LoCoMo: Long Conversational Memory (Snap Research)")
-    typer.echo("                 Tests multi-session conversational memory")
-    typer.echo("                 5 QA categories: identity, temporal, inference,")
-    typer.echo("                 contextual, adversarial")
+    typer.echo("  locomo           - LoCoMo: Long Conversational Memory (Snap Research)")
+    typer.echo("                     Tests multi-session conversational memory")
+    typer.echo("                     5 QA categories: identity, temporal, inference,")
+    typer.echo("                     contextual, adversarial")
+    typer.echo()
+    typer.echo("  contextbench     - Context-Bench: Multi-hop file navigation (Letta)")
+    typer.echo("                     Tests file navigation and entity relationship tracing")
+    typer.echo("                     Categories: direct, multi-hop, aggregation")
+    typer.echo()
+    typer.echo("  memoryagentbench - MemoryAgentBench: Agent memory consistency")
+    typer.echo("                     Tests 4 competencies: Accurate Retrieval,")
+    typer.echo("                     Test-Time Learning, Long-Range Understanding,")
+    typer.echo("                     Conflict Resolution (primary metric)")
 
 
 @app.command()
@@ -1137,12 +1140,14 @@ def publication_figures(
         title="Accuracy with 95% Confidence Intervals",
         dpi=dpi,
     )
-    # Prepare CI data from summaries
+    # Prepare CI data from summaries (pass raw adapter name, figures will format with version)
     ci_data = []
     for s in stats.summaries:
         ci_data.append(
             {
-                "adapter": f"{s.adapter_name} ({s.benchmark_name})",
+                "adapter": s.adapter_name,  # Raw name, figures.py adds version
+                "benchmark": s.benchmark_name,
+                "version": s.adapter_version,
                 "accuracy": s.metrics.accuracy,
                 "ci_lower": s.metrics.accuracy_ci[0]
                 if s.metrics.accuracy_ci[0] > 0

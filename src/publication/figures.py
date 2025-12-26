@@ -160,6 +160,8 @@ class PerformanceBarChart(FigureGenerator):
 
         for i, row in enumerate(data):
             adapter = row["adapter"]
+            version = row.get("version")
+            label = f"{adapter} (v{version})" if version else adapter
             values = [row.get("benchmarks", {}).get(b, 0.0) for b in benchmarks]
             color = self.colors[i % len(self.colors)]
 
@@ -167,7 +169,7 @@ class PerformanceBarChart(FigureGenerator):
                 x + offset + i * self.bar_width,
                 values,
                 self.bar_width,
-                label=adapter,
+                label=label,
                 color=color,
                 alpha=0.85,
             )
@@ -362,14 +364,25 @@ class ConfidenceIntervalPlot(FigureGenerator):
         if not MATPLOTLIB_AVAILABLE or not data:
             return None
 
-        adapters = [row["adapter"] for row in data]
+        # Build labels with version info when available
+        labels = []
+        for row in data:
+            adapter = row["adapter"]
+            version = row.get("version")
+            label = f"{adapter} (v{version})" if version else adapter
+            # Include benchmark if present for multi-benchmark plots
+            benchmark = row.get("benchmark")
+            if benchmark:
+                label = f"{label} ({benchmark})"
+            labels.append(label)
+
         accuracies = [row["accuracy"] for row in data]
         ci_lower = [row.get("ci_lower", row["accuracy"]) for row in data]
         ci_upper = [row.get("ci_upper", row["accuracy"]) for row in data]
 
         fig, ax = plt.subplots(figsize=self.figsize)
 
-        y_pos = np.arange(len(adapters))
+        y_pos = np.arange(len(labels))
 
         # Error bars
         errors = np.array(
@@ -399,7 +412,7 @@ class ConfidenceIntervalPlot(FigureGenerator):
         )
 
         ax.set_yticks(y_pos)
-        ax.set_yticklabels(adapters)
+        ax.set_yticklabels(labels)
         ax.set_xlabel("Accuracy", fontsize=12)
         ax.set_title(self.title, fontsize=14, fontweight="bold")
         ax.set_xlim(0, 1.0)

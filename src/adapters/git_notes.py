@@ -785,8 +785,9 @@ class GitNotesAdapter(MemorySystemAdapter):
         assert self._index_service is not None
         assert self._embedding_service is not None
 
-        from git_notes_memory.models import Memory
         import hashlib
+
+        from git_notes_memory.models import Memory
 
         # Get current commit SHA (or use a placeholder)
         try:
@@ -808,7 +809,7 @@ class GitNotesAdapter(MemorySystemAdapter):
         memories: list[Memory] = []
         results: list[MemoryOperationResult] = []
 
-        for idx, (content, metadata) in enumerate(items):
+        for _idx, (content, metadata) in enumerate(items):
             try:
                 namespace = _extract_namespace_from_metadata(metadata)
                 summary = _extract_summary_from_content(content)

@@ -2,7 +2,7 @@
 # Primary interface for development commands
 # Requires: uv (preferred) or pip
 
-.PHONY: all install dev test test-unit test-integration test-e2e test-all lint format typecheck clean check help pre-commit coverage docs docker-build-cpu docker-build-gpu docker-test docker-test-e2e docker-test-all docker-smoke docker-benchmark-locomo docker-benchmark-lme docker-benchmark-all docker-benchmark-quick benchmark-report benchmark-publication benchmark-full-pipeline
+.PHONY: all install dev test test-unit test-integration test-e2e test-all lint format typecheck clean check help pre-commit coverage docs docker-build-cpu docker-build-gpu docker-test docker-test-e2e docker-test-all docker-smoke docker-benchmark-locomo docker-benchmark-lme docker-benchmark-contextbench docker-benchmark-mab docker-benchmark-all docker-benchmark-parallel docker-benchmark-quick benchmark-report benchmark-publication benchmark-full-pipeline
 
 # Default Python version for local development
 PYTHON_VERSION ?= 3.11
@@ -226,12 +226,48 @@ docker-benchmark-lme: docker-build-cpu ## Run LongMemEval benchmark in Docker
 		--output /app/results
 	@echo "$(GREEN)LongMemEval results saved to $(BENCHMARK_OUTPUT)/$(NC)"
 
-docker-benchmark-all: docker-build-cpu ## Run ALL benchmarks in Docker (publication)
-	@echo "$(BLUE)Running all benchmarks for publication...$(NC)"
+docker-benchmark-contextbench: docker-build-cpu ## Run Context-Bench benchmark in Docker
+	@echo "$(BLUE)Running Context-Bench benchmark (trials=$(BENCHMARK_TRIALS), adapters=$(BENCHMARK_ADAPTERS))...$(NC)"
+	@mkdir -p $(BENCHMARK_OUTPUT)
+	docker compose -f docker/docker-compose.yml run --rm \
+		-e OPENAI_API_KEY=$(OPENAI_API_KEY) \
+		benchmark-lite run contextbench \
+		--adapter $(BENCHMARK_ADAPTERS) \
+		--trials $(BENCHMARK_TRIALS) \
+		--output /app/results
+	@echo "$(GREEN)Context-Bench results saved to $(BENCHMARK_OUTPUT)/$(NC)"
+
+docker-benchmark-mab: docker-build-cpu ## Run MemoryAgentBench benchmark in Docker
+	@echo "$(BLUE)Running MemoryAgentBench benchmark (trials=$(BENCHMARK_TRIALS), adapters=$(BENCHMARK_ADAPTERS))...$(NC)"
+	@mkdir -p $(BENCHMARK_OUTPUT)
+	docker compose -f docker/docker-compose.yml run --rm \
+		-e OPENAI_API_KEY=$(OPENAI_API_KEY) \
+		benchmark-lite run memoryagentbench \
+		--adapter $(BENCHMARK_ADAPTERS) \
+		--trials $(BENCHMARK_TRIALS) \
+		--output /app/results
+	@echo "$(GREEN)MemoryAgentBench results saved to $(BENCHMARK_OUTPUT)/$(NC)"
+
+docker-benchmark-all: docker-build-cpu ## Run ALL benchmarks in Docker (sequential)
+	@echo "$(BLUE)Running all benchmarks for publication (sequential)...$(NC)"
 	@echo "$(YELLOW)Configuration: trials=$(BENCHMARK_TRIALS), adapters=$(BENCHMARK_ADAPTERS)$(NC)"
 	@mkdir -p $(BENCHMARK_OUTPUT)
 	$(MAKE) docker-benchmark-locomo
 	$(MAKE) docker-benchmark-lme
+	$(MAKE) docker-benchmark-contextbench
+	$(MAKE) docker-benchmark-mab
+	@echo "$(GREEN)All benchmark results saved to $(BENCHMARK_OUTPUT)/$(NC)"
+
+docker-benchmark-parallel: docker-build-cpu ## Run ALL benchmarks in parallel (faster, needs resources)
+	@echo "$(BLUE)Running all benchmarks in parallel...$(NC)"
+	@echo "$(YELLOW)Configuration: trials=$(BENCHMARK_TRIALS), adapters=$(BENCHMARK_ADAPTERS)$(NC)"
+	@echo "$(YELLOW)Note: Requires sufficient CPU/memory and API rate limits$(NC)"
+	@mkdir -p $(BENCHMARK_OUTPUT)
+	@docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run locomo --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results & \
+	docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run longmemeval --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results & \
+	docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run contextbench --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results & \
+	docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run memoryagentbench --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results & \
+	wait
 	@echo "$(GREEN)All benchmark results saved to $(BENCHMARK_OUTPUT)/$(NC)"
 
 docker-benchmark-quick: docker-build-cpu ## Quick benchmark run (1 trial, mock adapter)

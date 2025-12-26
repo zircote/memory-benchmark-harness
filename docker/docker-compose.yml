@@ -72,6 +72,8 @@ services:
     - ../data:/app/data:rw
     - ../results:/app/results:rw
     - ../config:/app/config:ro
+    # Context-Bench dataset (letta-evals repo)
+    - ../letta-evals:/app/letta-evals:ro
     # Cache HuggingFace models to avoid re-downloading
     - benchmark-cache:/app/.cache/huggingface
     environment:

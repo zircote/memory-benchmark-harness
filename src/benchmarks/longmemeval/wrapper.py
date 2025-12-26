@@ -250,9 +250,7 @@ class LongMemEvalAgent:
         logger.info(f"Ingested {total_messages} messages from {len(sessions)} sessions")
         return results
 
-    def _ingest_all_sessions_batch(
-        self, sessions: list[LongMemEvalSession]
-    ) -> dict[str, int]:
+    def _ingest_all_sessions_batch(self, sessions: list[LongMemEvalSession]) -> dict[str, int]:
         """Ingest all sessions using optimized batch ingestion.
 
         This is ~30-100x faster than individual ingestion for adapters
@@ -285,9 +283,7 @@ class LongMemEvalAgent:
                 items.append((content, metadata))
                 session_counts[session.session_id] += 1
 
-        logger.info(
-            f"Batch ingesting {len(items)} messages from {len(sessions)} sessions..."
-        )
+        logger.info(f"Batch ingesting {len(items)} messages from {len(sessions)} sessions...")
 
         # Use batch ingestion
         results = self._adapter.add_batch_fast(  # type: ignore[attr-defined]
@@ -311,8 +307,7 @@ class LongMemEvalAgent:
 
         total_success = sum(success_counts.values())
         logger.info(
-            f"Batch ingested {total_success}/{len(items)} messages "
-            f"from {len(sessions)} sessions"
+            f"Batch ingested {total_success}/{len(items)} messages from {len(sessions)} sessions"
         )
 
         return success_counts

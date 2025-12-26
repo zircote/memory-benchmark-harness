@@ -306,13 +306,13 @@ def _parse_question(
     context = raw.get("context", "")
     metadata = raw.get("metadata", {})
 
-    # Get question lists
-    question_texts = raw.get("questions", [])
-    answers_list = raw.get("answers", [])
-    question_ids = metadata.get("question_ids", [])
-    question_types = metadata.get("question_types", [])
-    question_dates = metadata.get("question_dates", [])
-    qa_pair_ids = metadata.get("qa_pair_ids", [])
+    # Get question lists (handle explicit None values)
+    question_texts = raw.get("questions") or []
+    answers_list = raw.get("answers") or []
+    question_ids = metadata.get("question_ids") or []
+    question_types = metadata.get("question_types") or []
+    question_dates = metadata.get("question_dates") or []
+    qa_pair_ids = metadata.get("qa_pair_ids") or []
 
     # Parse haystack sessions if present
     haystack_raw = metadata.get("haystack_sessions", [])

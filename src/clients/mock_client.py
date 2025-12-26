@@ -76,6 +76,27 @@ class MockLLMClient:
             },
         )
 
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        max_tokens: int = 1024,
+    ) -> str:
+        """Generate a mock response (alternative interface).
+
+        Some benchmark agents use generate() instead of complete().
+
+        Args:
+            prompt: User prompt
+            system_prompt: Optional system prompt (ignored in mock)
+            max_tokens: Maximum tokens (ignored in mock)
+
+        Returns:
+            Mock response string
+        """
+        self._call_count += 1
+        return f"{self.default_response} (call #{self._call_count})"
+
     @property
     def call_count(self) -> int:
         """Number of mock calls made."""

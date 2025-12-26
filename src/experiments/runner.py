@@ -13,6 +13,7 @@ The runner follows the spec requirements:
 from __future__ import annotations
 
 import json
+import logging
 import random
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -22,6 +23,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from src.adapters.base import MemorySystemAdapter
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from src.evaluation.judge import LLMJudge
@@ -54,6 +57,49 @@ class LLMClientProtocol(Protocol):
     async def generate(self, prompt: str, **kwargs: Any) -> Any:
         """Generate a response from the LLM."""
         ...
+
+
+class _ContextBenchWrapper:
+    """Wrapper to adapt ContextBenchPipeline to BenchmarkProtocol.
+
+    ContextBenchPipeline uses evaluate() instead of run(), and needs
+    the agent+pipeline created with the dataset at run time.
+    """
+
+    def __init__(self, adapter: Any, llm_client: Any, judge: Any) -> None:
+        self._adapter = adapter
+        self._llm_client = llm_client
+        self._judge = judge
+
+    def run(self, dataset: Any, *_args: Any, **_kwargs: Any) -> Any:
+        """Run evaluation with dataset."""
+        from src.benchmarks.contextbench import ContextBenchAgent, ContextBenchPipeline
+
+        # Create agent with dataset
+        agent = ContextBenchAgent(
+            adapter=self._adapter,
+            dataset=dataset,
+            llm=self._llm_client,
+        )
+        # Create pipeline with agent and judge
+        pipeline = ContextBenchPipeline(agent=agent, judge=self._judge)
+        # Call evaluate() which returns EvaluationResult
+        return pipeline.evaluate(dataset=dataset)
+
+
+class _MemoryAgentBenchWrapper:
+    """Wrapper to adapt MemoryAgentBenchPipeline to BenchmarkProtocol.
+
+    MemoryAgentBenchPipeline uses evaluate_dataset() instead of run().
+    """
+
+    def __init__(self, pipeline: Any) -> None:
+        self._pipeline = pipeline
+
+    def run(self, dataset: Any, *_args: Any, **_kwargs: Any) -> Any:
+        """Run evaluation with dataset."""
+        # Call evaluate_dataset() which returns SplitResult
+        return self._pipeline.evaluate_dataset(dataset)
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,7 +229,13 @@ class ExperimentConfig:
 
     def __post_init__(self) -> None:
         """Validate configuration."""
-        valid_benchmarks = {"longmemeval", "locomo"}
+        valid_benchmarks = {
+            "longmemeval",
+            "locomo",
+            "contextbench",
+            "memoryagentbench",
+            # "terminalbench" requires Docker/Harbor setup - not yet integrated
+        }
         if self.benchmark not in valid_benchmarks:
             raise ValueError(
                 f"Invalid benchmark: {self.benchmark}. Must be one of: {valid_benchmarks}"
@@ -313,6 +365,23 @@ class ExperimentRunner:
                 return load_locomo_from_file(self.config.dataset_path), "locomo"
             return load_locomo(), "locomo"
 
+        elif self.config.benchmark == "contextbench":
+            from src.benchmarks.contextbench import (
+                load_contextbench,
+                load_contextbench_from_file,
+            )
+
+            if self.config.dataset_path:
+                return load_contextbench_from_file(self.config.dataset_path), "contextbench"
+            return load_contextbench(), "contextbench"
+
+        elif self.config.benchmark == "memoryagentbench":
+            from src.benchmarks.memoryagentbench import load_memoryagentbench
+
+            # Note: load_memoryagentbench_from_file requires competency param,
+            # so we only support HuggingFace loading for now (dataset_path ignored)
+            return load_memoryagentbench(), "memoryagentbench"
+
         else:
             raise ValueError(f"Unknown benchmark: {self.config.benchmark}")
 
@@ -358,6 +427,29 @@ class ExperimentRunner:
                 self.config.llm_client,  # type: ignore[arg-type]
                 judge,
             )
+
+        elif self.config.benchmark == "contextbench":
+            # ContextBench pipeline will create its agent internally
+            # We pass adapter and llm_client via a deferred wrapper
+            return _ContextBenchWrapper(
+                adapter=adapter,
+                llm_client=self.config.llm_client,
+                judge=judge,
+            )
+
+        elif self.config.benchmark == "memoryagentbench":
+            from src.benchmarks.memoryagentbench import (
+                MemoryAgentBenchAgent,
+                MemoryAgentBenchPipeline,
+            )
+
+            # MemoryAgentBench needs agent wrapping adapter+llm, then pipeline wrapping agent+judge
+            agent = MemoryAgentBenchAgent(
+                adapter=adapter,
+                llm=self.config.llm_client,  # type: ignore[arg-type]
+            )
+            pipeline = MemoryAgentBenchPipeline(agent=agent, judge=judge)  # type: ignore[arg-type]
+            return _MemoryAgentBenchWrapper(pipeline)
 
         else:
             raise ValueError(f"Unknown benchmark: {self.config.benchmark}")
@@ -460,6 +552,50 @@ class ExperimentRunner:
                         }
                         for conv_id, m in assessment.conversation_metrics.items()
                     ],
+                }
+            elif self.config.benchmark == "contextbench":
+                # EvaluationResult from ContextBenchPipeline
+                metrics = {
+                    "accuracy": assessment.accuracy,
+                    "correct_count": assessment.correct_count,
+                    "total_questions": assessment.total_questions,
+                    "total_cost": assessment.total_cost,
+                    "avg_operations": assessment.avg_operations,
+                }
+                raw_results = {
+                    "started_at": assessment.started_at,
+                    "completed_at": assessment.completed_at,
+                    "category_breakdown": assessment.category_breakdown,
+                    "hop_breakdown": assessment.hop_breakdown,
+                    "question_results": [
+                        {
+                            "question_id": r.question_id,
+                            "correct": r.correct,
+                            "category": r.category.value,
+                            "hop_count": r.hop_count,
+                            "operations_count": r.operations_count,
+                        }
+                        for r in assessment.question_results
+                    ],
+                }
+            elif self.config.benchmark == "memoryagentbench":
+                # SplitResult from MemoryAgentBenchPipeline
+                metrics = {
+                    "accuracy": assessment.overall_accuracy,
+                    "total_questions": assessment.total_questions,
+                    "conflict_resolution_accuracy": assessment.conflict_resolution_accuracy,
+                }
+                raw_results = {
+                    "started_at": assessment.started_at,
+                    "completed_at": assessment.completed_at,
+                    "competency_results": {
+                        c.value: {
+                            "accuracy": r.accuracy,
+                            "total_questions": r.total_questions,
+                            "correct_count": r.correct_count,
+                        }
+                        for c, r in assessment.competency_results.items()
+                    },
                 }
             else:
                 metrics = {}

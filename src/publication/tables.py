@@ -133,7 +133,11 @@ class MainResultsTable(TableGenerator):
 
         # Data rows
         for row in data:
-            adapter = self._escape_latex(row["adapter"])
+            adapter = row["adapter"]
+            version = row.get("version")
+            if version:
+                adapter = f"{adapter} (v{version})"
+            adapter = self._escape_latex(adapter)
             benchmark_values = []
             for b in benchmarks:
                 val = row.get("benchmarks", {}).get(b, 0.0)
@@ -183,7 +187,11 @@ class MainResultsTable(TableGenerator):
 
         # Data rows
         for row in data:
-            values = [row["adapter"]]
+            adapter = row["adapter"]
+            version = row.get("version")
+            if version:
+                adapter = f"{adapter} (v{version})"
+            values = [adapter]
             for b in benchmarks:
                 val = row.get("benchmarks", {}).get(b, 0.0)
                 values.append(f"{val:.1%}")
