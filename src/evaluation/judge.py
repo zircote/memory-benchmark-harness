@@ -518,11 +518,22 @@ class LLMJudge:
                 backoff = min(backoff * self.BACKOFF_MULTIPLIER, self.MAX_BACKOFF)
 
             except ValueError as e:
-                # Parse errors - don't retry
+                # Parse errors - retry on empty responses, fail fast on malformed
                 last_error = e
                 self._error_count += 1
-                logger.error(f"Parse error (not retrying): {e}")
-                return self._error_judgment(question, reference_answer, model_answer, str(e))
+                error_str = str(e)
+                # Empty responses may be transient - retry with backoff
+                if "Empty response" in error_str or "line 1 column 1" in error_str:
+                    logger.warning(
+                        f"Empty/invalid response (attempt {attempt + 1}/{self.MAX_RETRIES}), "
+                        f"backing off {backoff:.1f}s: {e}"
+                    )
+                    time.sleep(backoff)
+                    backoff = min(backoff * self.BACKOFF_MULTIPLIER, self.MAX_BACKOFF)
+                else:
+                    # Malformed JSON with content - don't retry
+                    logger.error(f"Parse error (not retrying): {e}")
+                    return self._error_judgment(question, reference_answer, model_answer, str(e))
 
         # All retries exhausted
         error_msg = f"All {self.MAX_RETRIES} retries exhausted. Last error: {last_error}"
