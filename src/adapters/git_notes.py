@@ -465,11 +465,14 @@ class GitNotesAdapter(MemorySystemAdapter):
             )
 
     def clear(self) -> MemoryOperationResult:
-        """Clear all memories from the index.
+        """Clear all memories from the index and reset service singletons.
 
         This clears the vector index but does NOT remove git notes
         from the repository. A subsequent reindex() would restore
         all memories.
+
+        Also resets the ServiceRegistry singletons to allow fresh adapter
+        instances to be created (critical for multi-trial benchmarks).
 
         For benchmark isolation, this is sufficient as it prevents
         previous run's memories from affecting current searches.
@@ -488,11 +491,16 @@ class GitNotesAdapter(MemorySystemAdapter):
 
             count = self._index_service.clear()
 
+            # Reset service singletons to allow fresh instances on next adapter creation
+            # This is critical for multi-trial benchmarks where each trial needs
+            # fresh services but the ServiceRegistry retains singletons
+            self._reset_services()
+
             return MemoryOperationResult(
                 success=True,
                 metadata={
                     "cleared_count": count,
-                    "note": "Index cleared; git notes preserved",
+                    "note": "Index cleared; git notes preserved; services reset",
                 },
             )
 
@@ -502,6 +510,37 @@ class GitNotesAdapter(MemorySystemAdapter):
                 success=False,
                 error=str(e),
             )
+
+    def _reset_services(self) -> None:
+        """Reset all service singletons for benchmark isolation.
+
+        The git-notes-memory library uses ServiceRegistry to manage singleton
+        services (SyncService, EmbeddingService, etc.). When running multiple
+        trials, each trial creates a new adapter instance, but the singletons
+        persist causing "Service instance already exists" errors.
+
+        This method clears all registered singletons, allowing fresh instances
+        to be created for subsequent trials.
+        """
+        try:
+            from git_notes_memory.registry import ServiceRegistry
+
+            ServiceRegistry.reset()
+
+            # Also reset our local references so we reinitialize on next use
+            self._capture_service = None
+            self._recall_service = None
+            self._sync_service = None
+            self._index_service = None
+            self._embedding_service = None
+            self._batch_capture_service = None
+            self._initialized = False
+
+            logger.debug("Reset ServiceRegistry and adapter state for benchmark isolation")
+        except ImportError:
+            # If registry module isn't available, just reset local state
+            logger.warning("ServiceRegistry not available; only resetting local adapter state")
+            self._initialized = False
 
     def get_stats(self) -> dict[str, Any]:
         """Get memory system statistics.

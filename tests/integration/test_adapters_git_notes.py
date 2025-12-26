@@ -39,6 +39,34 @@ pytestmark = pytest.mark.skipif(
 # =============================================================================
 
 
+@pytest.fixture(autouse=True)
+def reset_service_registry() -> Generator[None, None, None]:
+    """Reset ServiceRegistry before and after each test for isolation.
+
+    The git-notes-memory library uses a ServiceRegistry singleton pattern.
+    Without resetting between tests, service instances persist and cause
+    "Service instance already exists" errors when tests try to create
+    new adapters with different repo paths.
+    """
+    # Reset before test
+    try:
+        from git_notes_memory.registry import ServiceRegistry
+
+        ServiceRegistry.reset()
+    except ImportError:
+        pass
+
+    yield
+
+    # Reset after test
+    try:
+        from git_notes_memory.registry import ServiceRegistry
+
+        ServiceRegistry.reset()
+    except ImportError:
+        pass
+
+
 @pytest.fixture
 def temp_git_repo() -> Generator[Path, None, None]:
     """Create a temporary git repository for testing.
