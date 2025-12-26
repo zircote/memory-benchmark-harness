@@ -426,11 +426,12 @@ class LLMJudge:
                 start_time = time.monotonic()
                 self._call_count += 1
 
+                # Use max_completion_tokens (gpt-5 models require this instead of max_tokens)
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=self.temperature,
-                    max_tokens=self.max_tokens,
+                    max_completion_tokens=self.max_tokens,
                     response_format={"type": "json_object"},
                 )
 

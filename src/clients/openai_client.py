@@ -87,11 +87,12 @@ class OpenAIClient:
         all_messages.extend(messages)
 
         # Call OpenAI API
+        # Use max_completion_tokens (gpt-5 models require this instead of max_tokens)
         response = self.client.chat.completions.create(
             model=self.model,
             messages=all_messages,  # type: ignore[arg-type]
             temperature=temperature,
-            max_tokens=self.max_tokens,
+            max_completion_tokens=self.max_tokens,
         )
 
         content = response.choices[0].message.content or ""
