@@ -136,7 +136,7 @@ class LoCoMoAgent:
     Example:
         ```python
         adapter = GitNotesAdapter(repo_path="/path/to/repo")
-        llm = OpenAIClient(model="gpt-4o")
+        llm = OpenAIClient(model="gpt-5-nano")
         agent = LoCoMoAgent(adapter, llm)
 
         # Ingest conversation (all sessions)

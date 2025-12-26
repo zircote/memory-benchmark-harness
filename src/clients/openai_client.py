@@ -34,7 +34,7 @@ class OpenAIClient:
 
     Example:
         ```python
-        client = OpenAIClient(model="gpt-4o")
+        client = OpenAIClient(model="gpt-5-nano")
         response = client.complete(
             system="You are a helpful assistant.",
             messages=[{"role": "user", "content": "Hello!"}],
@@ -49,7 +49,7 @@ class OpenAIClient:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "gpt-4o",
+        model: str = "gpt-5-nano",
         max_tokens: int = 1000,
     ) -> None:
         """Initialize the OpenAI client.

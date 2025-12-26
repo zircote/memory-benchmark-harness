@@ -322,7 +322,7 @@ class LLMJudge:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "gpt-4o",
+        model: str = "gpt-5-nano",
         cache_dir: Path | str = ".cache/judgments",
         cache_ttl_days: int = 30,
         prompt_template: str | None = None,
