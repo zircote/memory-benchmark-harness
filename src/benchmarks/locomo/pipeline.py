@@ -285,7 +285,7 @@ class LoCoMoPipeline:
 
         # Set up components
         adapter = GitNotesAdapter(repo_path="/path/to/repo")
-        llm_client = OpenAIClient(model="gpt-5-nano")
+        llm_client = OpenAIClient(model="gpt-5-mini")
         judge = LLMJudge(client=llm_client)
 
         # Load dataset and create pipeline
