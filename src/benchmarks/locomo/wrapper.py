@@ -365,15 +365,25 @@ class LoCoMoAgent:
     def ingest_all_conversations(
         self,
         conversations: list[LoCoMoConversation],
+        *,
+        use_batch: bool = True,
     ) -> dict[str, IngestionResult]:
         """Ingest multiple conversations into memory.
 
         Args:
             conversations: List of conversations to ingest
+            use_batch: If True and adapter supports it, use batch ingestion (~100x faster)
 
         Returns:
             Dictionary mapping conversation_id to IngestionResult
         """
+        # Check if adapter supports fast batch ingestion
+        has_batch = hasattr(self._adapter, "add_batch_fast") and use_batch
+
+        if has_batch:
+            return self._ingest_all_conversations_batch(conversations)
+
+        # Fallback to individual ingestion
         results: dict[str, IngestionResult] = {}
         total_turns = 0
 
@@ -384,6 +394,100 @@ class LoCoMoAgent:
 
         logger.info(f"Ingested {total_turns} turns from {len(conversations)} conversations")
         return results
+
+    def _ingest_all_conversations_batch(
+        self,
+        conversations: list[LoCoMoConversation],
+    ) -> dict[str, IngestionResult]:
+        """Ingest all conversations using optimized batch ingestion.
+
+        This is ~100x faster than individual ingestion for adapters
+        that support add_batch_fast() (e.g., GitNotesAdapter).
+
+        Args:
+            conversations: List of conversations to ingest
+
+        Returns:
+            Dictionary mapping conversation_id to IngestionResult
+        """
+        # Collect all turns as (content, metadata) tuples
+        items: list[tuple[str, dict[str, Any]]] = []
+        # Track which items belong to which conversation/session
+        item_mapping: list[tuple[str, int]] = []  # (conversation_id, session_num)
+
+        for conv in conversations:
+            for session in conv.sessions:
+                for turn in session.turns:
+                    # Build content
+                    content = f"{turn.speaker}: {turn.text}"
+
+                    # Build metadata
+                    metadata: dict[str, Any] = {
+                        "conversation_id": conv.sample_id,
+                        "session_num": session.session_num,
+                        "speaker": turn.speaker,
+                        "dia_id": turn.dia_id,
+                        "turn_num": turn.turn_num,
+                        "namespace": "locomo",
+                    }
+                    if session.timestamp:
+                        metadata["timestamp"] = session.timestamp
+                    if turn.img_url:
+                        metadata["has_image"] = True
+
+                    items.append((content, metadata))
+                    item_mapping.append((conv.sample_id, session.session_num))
+
+        logger.info(
+            f"Batch ingesting {len(items)} turns from {len(conversations)} conversations..."
+        )
+
+        # Use batch ingestion
+        results = self._adapter.add_batch_fast(  # type: ignore[attr-defined]
+            items,
+            batch_size=64,
+            show_progress=True,
+        )
+
+        # Build per-conversation results
+        conv_results: dict[str, IngestionResult] = {}
+        conv_turns: dict[str, int] = {c.sample_id: 0 for c in conversations}
+        conv_sessions: dict[str, set[int]] = {c.sample_id: set() for c in conversations}
+        conv_errors: dict[str, list[str]] = {c.sample_id: [] for c in conversations}
+
+        for idx, (result, (conv_id, session_num)) in enumerate(
+            zip(results, item_mapping, strict=True)
+        ):
+            if result.success:
+                conv_turns[conv_id] += 1
+                conv_sessions[conv_id].add(session_num)
+            else:
+                conv_errors[conv_id].append(f"Turn {idx}: {result.error}")
+
+        # Build IngestionResult for each conversation
+        for conv in conversations:
+            conv_id = conv.sample_id
+            conv_results[conv_id] = IngestionResult(
+                conversation_id=conv_id,
+                sessions_ingested=len(conv_sessions[conv_id]),
+                turns_ingested=conv_turns[conv_id],
+                total_turns=conv.total_turns,
+                errors=conv_errors[conv_id],
+            )
+            # Track ingested conversations and sessions
+            self._ingested_conversations.add(conv_id)
+            if conv_id not in self._ingested_sessions:
+                self._ingested_sessions[conv_id] = set()
+            self._ingested_sessions[conv_id].update(conv_sessions[conv_id])
+            self._total_turns_ingested += conv_turns[conv_id]
+
+        total_success = sum(conv_turns.values())
+        logger.info(
+            f"Batch ingested {total_success}/{len(items)} turns "
+            f"from {len(conversations)} conversations"
+        )
+
+        return conv_results
 
     def answer_question(
         self,
