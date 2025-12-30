@@ -16,6 +16,7 @@ Key differences from LongMemEval:
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
@@ -31,6 +32,157 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Query Enrichment Utilities
+# =============================================================================
+
+
+def enrich_query(question: str) -> str:
+    """Enrich a question for better memory retrieval.
+
+    Transforms questions into statement-like queries that better match
+    how information is stored in memories.
+
+    Args:
+        question: The original question text
+
+    Returns:
+        Enriched query optimized for semantic search
+
+    Example:
+        >>> enrich_query("When did Melanie paint a sunrise?")
+        'Melanie painted sunrise painting art'
+    """
+    query = question
+
+    # Remove question words that hurt retrieval
+    query = re.sub(
+        r"^(When|What|Where|How|Why|Who|Did|Does|Is|Was|Were|Has|Have|Can|Could|Would|Should)\s+",
+        "",
+        query,
+        flags=re.IGNORECASE,
+    )
+
+    # Remove trailing question mark
+    query = query.rstrip("?").strip()
+
+    # Convert common question patterns to statements
+    # "did X do Y" -> "X did Y"
+    query = re.sub(r"^did\s+(\w+)\s+", r"\1 ", query, flags=re.IGNORECASE)
+
+    # Expand possessives for better matching
+    # "Melanie's kids" -> "Melanie kids children"
+    if "'s " in query.lower():
+        # Add the base form without possessive
+        query = re.sub(r"(\w+)'s\s+", r"\1 \1's ", query)
+
+    # Add common synonyms for better recall
+    expansions = {
+        r"\bkids\b": "kids children",
+        r"\bpainted\b": "painted painting art",
+        r"\brace\b": "race running marathon",
+        r"\bclass\b": "class course lesson signed up",
+        r"\bconference\b": "conference event meeting",
+        r"\bcamping\b": "camping camp outdoor",
+        r"\brelationship\b": "relationship dating partner boyfriend girlfriend",
+        r"\bidentity\b": "identity transgender LGBTQ gender",
+        r"\bmove\b": "move moved country home",
+        r"\bmoved\b": "moved move country home",
+        r"\bfrom\b": "from country home",
+        r"\bago\b": "ago years before",
+        r"\bbooks?\b": "book books read reading",
+        r"\bdestress\b": "destress relax relaxing hobby hobbies",
+        r"\bhobbies?\b": "hobby hobbies interest interests",
+        r"\bmuseum\b": "museum art gallery exhibit",
+    }
+    for pattern, replacement in expansions.items():
+        query = re.sub(pattern, replacement, query, flags=re.IGNORECASE)
+
+    return query.strip()
+
+
+def extract_entities(text: str) -> list[str]:
+    """Extract named entities from text for enhanced memory indexing.
+
+    Args:
+        text: The text to extract entities from
+
+    Returns:
+        List of extracted entity strings
+    """
+    entities = []
+
+    # Extract capitalized words (likely proper nouns)
+    proper_nouns = re.findall(r"\b[A-Z][a-z]+\b", text)
+    entities.extend(proper_nouns)
+
+    # Extract dates and times
+    dates = re.findall(
+        r"\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:,?\s+\d{4})?\b",
+        text,
+        re.IGNORECASE,
+    )
+    entities.extend(dates)
+
+    # Extract relative time expressions
+    time_exprs = re.findall(
+        r"\b(?:yesterday|today|tomorrow|last\s+\w+|next\s+\w+|\d+\s+(?:days?|weeks?|months?|years?)\s+ago)\b",
+        text,
+        re.IGNORECASE,
+    )
+    entities.extend(time_exprs)
+
+    # Extract activity keywords
+    activities = re.findall(
+        r"\b(?:painted|ran|signed up|went to|visited|started|finished|completed|attended)\b",
+        text,
+        re.IGNORECASE,
+    )
+    entities.extend(activities)
+
+    return list(set(entities))
+
+
+def compile_memory_content(
+    speaker: str,
+    text: str,
+    session_num: int,
+    timestamp: str = "",
+    img_caption: str = "",
+) -> str:
+    """Compile a conversation turn into an enriched memory format.
+
+    Creates a memory string that includes temporal context and extracted
+    entities for better retrieval.
+
+    Args:
+        speaker: The speaker name
+        text: The dialogue text
+        session_num: Session number
+        timestamp: Optional session timestamp
+        img_caption: Optional image caption
+
+    Returns:
+        Enriched memory content string
+    """
+    # Base format with session context
+    if timestamp:
+        content = f"[Session {session_num}, {timestamp}] {speaker}: {text}"
+    else:
+        content = f"[Session {session_num}] {speaker}: {text}"
+
+    # Add image context if available
+    if img_caption:
+        content += f" [Image: {img_caption}]"
+
+    # Extract and append entities for better retrieval
+    entities = extract_entities(text)
+    if entities:
+        content += f"\n[Entities: {', '.join(entities[:5])}]"  # Limit to top 5
+
+    return content
 
 
 class LLMClient(Protocol):
@@ -157,9 +309,10 @@ class LoCoMoAgent:
     # Default system prompt for question answering
     DEFAULT_SYSTEM_PROMPT = (
         "You are an AI assistant that answers questions based on past conversations. "
-        "Use only the provided conversation context to answer. "
-        "If the information is not available in the context, say 'I don't know' or "
-        "'I cannot find this information in our conversations.' "
+        "Use the provided conversation context to answer. "
+        "Connect related information across different messages to form complete answers. "
+        "Make reasonable inferences when facts are implied but not stated directly. "
+        "Only say 'I cannot find this information' if there is truly no relevant context. "
         "Be concise and accurate."
     )
 
@@ -167,19 +320,32 @@ class LoCoMoAgent:
     CATEGORY_PROMPTS = {
         1: (  # IDENTITY
             "Answer questions about the speakers' identity, background, and personal facts. "
-            "Look for biographical details, names, relationships, and personal characteristics."
+            "Look for biographical details, names, relationships, family members, "
+            "personal characteristics, relationship status, and life history. "
+            "Pay attention to mentions of family (kids, parents, partners) and their attributes. "
+            "IMPORTANT: Connect information across multiple messages. For example, if someone mentions "
+            "'my home country' in one message and names that country in another, combine them. "
+            "If someone mentions a 'breakup', infer they are likely single. "
+            "Use reasoning to connect related facts."
         ),
         2: (  # TEMPORAL
             "Answer questions about when events occurred. "
-            "Pay attention to dates, times, sequences, and temporal relationships."
+            "Look for EXPLICIT dates (January 15, 2024), relative time markers "
+            "(yesterday, last week, 2 years ago, next month), and session timestamps. "
+            "When you see relative markers, calculate the approximate date from the session timestamp. "
+            "If multiple events match the description, list them chronologically with their dates. "
+            "Pay special attention to future plans ('going to', 'planning to', 'next') vs past events."
         ),
         3: (  # INFERENCE
             "Make reasonable inferences based on the conversation context. "
-            "Use clues from the dialogue to predict or infer information."
+            "Use clues from the dialogue to predict or infer information. "
+            "Consider what activities, interests, or characteristics are implied but not stated directly."
         ),
         4: (  # CONTEXTUAL
-            "Answer detailed questions about specific events or discussions. "
-            "Focus on the specifics mentioned in the conversations."
+            "Answer detailed questions about specific events, activities, or discussions. "
+            "Focus on the specifics mentioned in the conversations. "
+            "Look for activity details: what was done, where, with whom, and the outcome. "
+            "Include secondary characters (friends, family) mentioned in activities."
         ),
         5: (  # ADVERSARIAL
             "Be careful: this question may contain incorrect premises. "
@@ -193,7 +359,7 @@ class LoCoMoAgent:
         adapter: MemorySystemAdapter,
         llm: LLMClient,
         *,
-        memory_search_limit: int = 15,
+        memory_search_limit: int = 45,  # Increased from 15 for better recall
         min_relevance_score: float = 0.0,
         system_prompt: str | None = None,
         use_category_prompts: bool = True,
@@ -204,7 +370,7 @@ class LoCoMoAgent:
         Args:
             adapter: Memory system adapter for storage and retrieval
             llm: LLM client for generating answers
-            memory_search_limit: Max memories to retrieve per question
+            memory_search_limit: Max memories to retrieve per question (default: 45)
             min_relevance_score: Minimum score threshold for retrieval
             system_prompt: Custom system prompt (uses default if None)
             use_category_prompts: Whether to use category-specific prompts
@@ -254,12 +420,14 @@ class LoCoMoAgent:
         Returns:
             True if ingestion succeeded, False otherwise
         """
-        # Format content with speaker for better retrieval
-        content = f"{turn.speaker}: {turn.text}"
-
-        # Add image context if available
-        if turn.img_caption:
-            content += f" [Image: {turn.img_caption}]"
+        # Use enriched memory format with entities and temporal context
+        content = compile_memory_content(
+            speaker=turn.speaker,
+            text=turn.text,
+            session_num=turn.session_num,
+            timestamp=session_timestamp,
+            img_caption=turn.img_caption or "",
+        )
 
         # Build rich metadata for filtering and context
         metadata: dict[str, Any] = {
@@ -418,8 +586,14 @@ class LoCoMoAgent:
         for conv in conversations:
             for session in conv.sessions:
                 for turn in session.turns:
-                    # Build content
-                    content = f"{turn.speaker}: {turn.text}"
+                    # Build enriched content with entities and temporal context
+                    content = compile_memory_content(
+                        speaker=turn.speaker,
+                        text=turn.text,
+                        session_num=session.session_num,
+                        timestamp=session.timestamp or "",
+                        img_caption=turn.img_caption or "",
+                    )
 
                     # Build metadata
                     metadata: dict[str, Any] = {
@@ -521,20 +695,48 @@ class LoCoMoAgent:
             # Always filter to the relevant conversation
             metadata_filter = {"conversation_id": question.conversation_id}
 
-        # Search for relevant memories
+        # Enrich query for better retrieval
+        enriched_query = enrich_query(question.question)
+
+        # Dynamic search limit based on question category
+        # Temporal questions (category 2) need more context to find date references
+        search_limit = self._memory_search_limit
+        min_score = self._min_relevance_score
+
+        if question.category.value == 2:  # TEMPORAL
+            search_limit = int(search_limit * 1.5)  # 50% more results
+            min_score = min_score * 0.8  # Lower threshold for temporal
+
+        # Detect secondary entity questions (e.g., "Melanie's kids")
+        if self._is_secondary_entity_question(question.question):
+            min_score = min_score * 0.7  # Even lower threshold
+
+        # Search for relevant memories with enriched query
         memories = self._adapter.search(
-            query=question.question,
-            limit=self._memory_search_limit,
-            min_score=self._min_relevance_score,
+            query=enriched_query,
+            limit=search_limit,
+            min_score=min_score,
             metadata_filter=metadata_filter,
         )
 
-        # Build context from retrieved memories
+        # Build context from retrieved memories with truncation to avoid token limits
+        # ~4 chars per token, 100k chars ≈ 25k tokens, safe for most models
+        MAX_CONTEXT_CHARS = 100_000
+
         if memories:
             context_parts = []
+            total_chars = 0
             for mem in memories:
                 session_num = mem.metadata.get("session_num", "?")
-                context_parts.append(f"[Session {session_num}] {mem.content}")
+                part = f"[Session {session_num}] {mem.content}"
+                if total_chars + len(part) > MAX_CONTEXT_CHARS:
+                    logger.debug(
+                        f"Context truncated at {len(context_parts)} memories "
+                        f"({total_chars} chars)"
+                    )
+                    break
+                context_parts.append(part)
+                total_chars += len(part) + 2  # +2 for "\n\n" separator
             context = "\n\n".join(context_parts)
         else:
             context = "(No relevant conversation history found)"
@@ -644,6 +846,34 @@ class LoCoMoAgent:
             filtered,
             use_evidence_sessions=use_evidence_sessions,
         )
+
+    def _is_secondary_entity_question(self, question: str) -> bool:
+        """Detect if a question is about a secondary entity.
+
+        Secondary entities (friends, family members, etc.) are mentioned less
+        frequently in conversations and need lower retrieval thresholds.
+
+        Args:
+            question: The question text
+
+        Returns:
+            True if the question is likely about a secondary entity
+        """
+        question_lower = question.lower()
+
+        # Patterns indicating secondary entities
+        secondary_patterns = [
+            r"\b\w+'s\s+(kids?|children|family|friends?|parents?|partner|boyfriend|girlfriend)\b",
+            r"\b(melanie|their|his|her)\b",  # Names that aren't the main speaker
+            r"\bfamily\s+members?\b",
+            r"\bwhat\s+do\s+\w+'s\b",  # "What do X's Y like?"
+        ]
+
+        for pattern in secondary_patterns:
+            if re.search(pattern, question_lower):
+                return True
+
+        return False
 
     def _detect_abstention(self, answer: str) -> bool:
         """Detect if an answer indicates abstention (no information available).

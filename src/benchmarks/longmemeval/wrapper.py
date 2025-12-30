@@ -344,13 +344,25 @@ class LongMemEvalAgent:
             metadata_filter=metadata_filter,
         )
 
-        # Build context from retrieved memories
+        # Build context from retrieved memories with truncation to avoid token limits
+        # ~4 chars per token, 100k chars ≈ 25k tokens, safe for most models
+        MAX_CONTEXT_CHARS = 100_000
+
         if memories:
             context_parts = []
+            total_chars = 0
             for mem in memories:
                 # Include session context if available
                 session_id = mem.metadata.get("session_id", "unknown")
-                context_parts.append(f"[Session {session_id}] {mem.content}")
+                part = f"[Session {session_id}] {mem.content}"
+                if total_chars + len(part) > MAX_CONTEXT_CHARS:
+                    logger.debug(
+                        f"Context truncated at {len(context_parts)} memories "
+                        f"({total_chars} chars)"
+                    )
+                    break
+                context_parts.append(part)
+                total_chars += len(part) + 2  # +2 for "\n\n" separator
 
             context = "\n\n".join(context_parts)
         else:
