@@ -6,10 +6,14 @@ expected by benchmark pipelines (LongMemEval, LoCoMo, etc.).
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from openai import OpenAI
+
+if TYPE_CHECKING:
+    from git_notes_memory.observability import MetricsCollector
 
 
 @dataclass(slots=True)
@@ -81,6 +85,7 @@ class OpenAIClient:
             LLMResponse with the generated content
         """
         self._call_count += 1
+        start_time = time.perf_counter()
 
         # Build messages with system prompt
         all_messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
@@ -109,11 +114,49 @@ class OpenAIClient:
                 "total_tokens": response.usage.total_tokens,
             }
 
+        # Record telemetry
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        self._record_telemetry(latency_ms, usage)
+
         return LLMResponse(
             content=content,
             model=self.model,
             usage=usage,
         )
+
+    def _record_telemetry(self, latency_ms: float, usage: dict[str, int]) -> None:
+        """Record LLM call telemetry to observability system."""
+        try:
+            from git_notes_memory.observability import get_metrics
+
+            metrics = get_metrics()
+            labels = {"model": self.model, "operation": "complete"}
+
+            # Record latency histogram
+            metrics.observe("llm_latency_ms", latency_ms, labels)
+
+            # Record call counter
+            metrics.increment("llm_calls_total", 1, labels)
+
+            # Record token counters
+            if usage:
+                metrics.increment(
+                    "llm_tokens_total",
+                    usage.get("total_tokens", 0),
+                    {**labels, "type": "total"},
+                )
+                metrics.increment(
+                    "llm_tokens_total",
+                    usage.get("prompt_tokens", 0),
+                    {**labels, "type": "prompt"},
+                )
+                metrics.increment(
+                    "llm_tokens_total",
+                    usage.get("completion_tokens", 0),
+                    {**labels, "type": "completion"},
+                )
+        except ImportError:
+            pass  # Observability not available
 
     def generate(
         self,

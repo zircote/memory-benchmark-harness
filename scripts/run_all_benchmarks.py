@@ -521,8 +521,8 @@ def run_all_benchmarks(
     print(f"  Model: {model}")
     print(f"  API Key: ...{api_key[-8:]}")
 
-    llm = OpenAIClient(model=model)
-    judge = LLMJudge(model=model)
+    llm = OpenAIClient(model=model, max_tokens=2000)
+    judge = LLMJudge(model=model, max_tokens=1000)
 
     results: dict[str, Any] = {
         "timestamp": datetime.now(UTC).isoformat(),

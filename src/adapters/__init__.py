@@ -4,6 +4,7 @@ from .base import MemoryItem, MemoryOperationResult, MemorySystemAdapter
 from .git_notes import GitNotesAdapter
 from .mock import MockAdapter
 from .no_memory import NoMemoryAdapter
+from .subcog import SubcogAdapter
 
 __all__ = [
     "MemorySystemAdapter",
@@ -12,4 +13,5 @@ __all__ = [
     "GitNotesAdapter",
     "NoMemoryAdapter",
     "MockAdapter",
+    "SubcogAdapter",
 ]
