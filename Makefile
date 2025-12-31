@@ -117,6 +117,20 @@ coverage: ## Generate HTML coverage report
 	$(RUN) pytest tests/ --cov=src --cov-report=html --cov-report=xml
 	@echo "$(GREEN)Coverage report: htmlcov/index.html$(NC)"
 
+##@ Quick Validation
+
+validate: ## Quick validation: git-notes vs no-memory (20 questions)
+	@echo "$(BLUE)Running memory benefit validation...$(NC)"
+	$(PYTHON) scripts/validate_memory_benefit.py
+
+validate-verbose: ## Quick validation with per-question output
+	@echo "$(BLUE)Running memory benefit validation (verbose)...$(NC)"
+	$(PYTHON) scripts/validate_memory_benefit.py --verbose
+
+validate-full: ## Extended validation (50 questions)
+	@echo "$(BLUE)Running extended validation (50 questions)...$(NC)"
+	$(PYTHON) scripts/validate_memory_benefit.py --questions 50 --verbose
+
 ##@ Development
 
 run: ## Run the benchmark CLI
@@ -212,7 +226,8 @@ docker-benchmark-locomo: docker-build-cpu ## Run LoCoMo benchmark in Docker
 		benchmark-lite run locomo \
 		--adapter $(BENCHMARK_ADAPTERS) \
 		--trials $(BENCHMARK_TRIALS) \
-		--output /app/results
+		--output /app/results \
+		--verbose
 	@echo "$(GREEN)LoCoMo results saved to $(BENCHMARK_OUTPUT)/$(NC)"
 
 docker-benchmark-lme: docker-build-cpu ## Run LongMemEval benchmark in Docker
@@ -223,7 +238,8 @@ docker-benchmark-lme: docker-build-cpu ## Run LongMemEval benchmark in Docker
 		benchmark-lite run longmemeval \
 		--adapter $(BENCHMARK_ADAPTERS) \
 		--trials $(BENCHMARK_TRIALS) \
-		--output /app/results
+		--output /app/results \
+		--verbose
 	@echo "$(GREEN)LongMemEval results saved to $(BENCHMARK_OUTPUT)/$(NC)"
 
 docker-benchmark-contextbench: docker-build-cpu ## Run Context-Bench benchmark in Docker
@@ -234,7 +250,8 @@ docker-benchmark-contextbench: docker-build-cpu ## Run Context-Bench benchmark i
 		benchmark-lite run contextbench \
 		--adapter $(BENCHMARK_ADAPTERS) \
 		--trials $(BENCHMARK_TRIALS) \
-		--output /app/results
+		--output /app/results \
+		--verbose
 	@echo "$(GREEN)Context-Bench results saved to $(BENCHMARK_OUTPUT)/$(NC)"
 
 docker-benchmark-mab: docker-build-cpu ## Run MemoryAgentBench benchmark in Docker
@@ -245,7 +262,8 @@ docker-benchmark-mab: docker-build-cpu ## Run MemoryAgentBench benchmark in Dock
 		benchmark-lite run memoryagentbench \
 		--adapter $(BENCHMARK_ADAPTERS) \
 		--trials $(BENCHMARK_TRIALS) \
-		--output /app/results
+		--output /app/results \
+		--verbose
 	@echo "$(GREEN)MemoryAgentBench results saved to $(BENCHMARK_OUTPUT)/$(NC)"
 
 docker-benchmark-all: docker-build-cpu ## Run ALL benchmarks in Docker (sequential)
@@ -263,10 +281,10 @@ docker-benchmark-parallel: docker-build-cpu ## Run ALL benchmarks in parallel (f
 	@echo "$(YELLOW)Configuration: trials=$(BENCHMARK_TRIALS), adapters=$(BENCHMARK_ADAPTERS)$(NC)"
 	@echo "$(YELLOW)Note: Requires sufficient CPU/memory and API rate limits$(NC)"
 	@mkdir -p $(BENCHMARK_OUTPUT)
-	@docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run locomo --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results & \
-	docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run longmemeval --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results & \
-	docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run contextbench --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results & \
-	docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run memoryagentbench --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results & \
+	@docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run locomo --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results --verbose & \
+	docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run longmemeval --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results --verbose & \
+	docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run contextbench --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results --verbose & \
+	docker compose -f docker/docker-compose.yml run --rm -e OPENAI_API_KEY=$(OPENAI_API_KEY) benchmark-lite run memoryagentbench --adapter $(BENCHMARK_ADAPTERS) --trials $(BENCHMARK_TRIALS) --output /app/results --verbose & \
 	wait
 	@echo "$(GREEN)All benchmark results saved to $(BENCHMARK_OUTPUT)/$(NC)"
 
@@ -277,7 +295,8 @@ docker-benchmark-quick: docker-build-cpu ## Quick benchmark run (1 trial, mock a
 		benchmark-lite run locomo \
 		--adapter mock \
 		--trials 1 \
-		--output /app/results
+		--output /app/results \
+		--verbose
 	@echo "$(GREEN)Quick validation complete$(NC)"
 
 benchmark-report: ## Generate reports from benchmark results
