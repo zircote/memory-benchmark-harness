@@ -501,6 +501,19 @@ wheels = [
 ]
 
 [[package]]
+name = "detect-secrets"
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/69/67/382a863fff94eae5a0cf05542179169a1c49a4c8784a9480621e2066ca7d/detect_secrets-1.5.0.tar.gz", hash = "sha256:6bb46dcc553c10df51475641bb30fd69d25645cc12339e46c824c1e0c388898a", size = 97351, upload-time = "2024-05-06T17:46:19.721Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4e/5e/4f5fe4b89fde1dc3ed0eb51bd4ce4c0bca406246673d370ea2ad0c58d747/detect_secrets-1.5.0-py3-none-any.whl", hash = "sha256:e24e7b9b5a35048c313e983f76c4bd09dad89f045ff059e354f9943bf45aa060", size = 120341, upload-time = "2024-05-06T17:46:16.628Z" },
+]
+
+[[package]]
 name = "dill"
 version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -534,6 +547,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b2/9d/c3b43da9515bd270df0f80548d9944e389870713cc1fe2b8fb35fe2bcefd/docstring_parser-0.17.0.tar.gz", hash = "sha256:583de4a309722b3315439bb31d64ba3eebada841f2e2cee23b99df001434c912", size = 27442, upload-time = "2025-07-21T07:35:01.868Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/55/e2/2537ebcff11c1ee1ff17d8d0b6f4db75873e3b0fb32c2d4a2ee31ecb310a/docstring_parser-0.17.0-py3-none-any.whl", hash = "sha256:cf2569abd23dce8099b300f9b4fa8191e9582dda731fd533daf54c4551658708", size = 36896, upload-time = "2025-07-21T07:35:00.684Z" },
+]
+
+[[package]]
+name = "einops"
+version = "0.8.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e5/81/df4fbe24dff8ba3934af99044188e20a98ed441ad17a274539b74e82e126/einops-0.8.1.tar.gz", hash = "sha256:de5d960a7a761225532e0f1959e5315ebeafc0cd43394732f103ca44b9837e84", size = 54805, upload-time = "2025-02-09T03:17:00.434Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/62/9773de14fe6c45c23649e98b83231fffd7b9892b6cf863251dc2afa73643/einops-0.8.1-py3-none-any.whl", hash = "sha256:919387eb55330f5757c6bea9165c5ff5cfe63a642682ea788a6d472576d81737", size = 64359, upload-time = "2025-02-09T03:17:01.998Z" },
 ]
 
 [[package]]
@@ -715,17 +737,59 @@ http = [
 
 [[package]]
 name = "git-notes-memory"
-version = "0.9.1"
-source = { registry = "https://pypi.org/simple" }
+source = { editable = "../git-notes-memory" }
 dependencies = [
+    { name = "detect-secrets" },
+    { name = "einops" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
     { name = "sentence-transformers" },
     { name = "sqlite-vec" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/17/d9/b99a1b89c1ed1a8f3f00d895c68abdec4905f1f5967d60c15724e225066b/git_notes_memory-0.9.1.tar.gz", hash = "sha256:b9752941f4909c533717b911aac5acecaf78c4b6cfc831a838ed2474b7b1738b", size = 128519, upload-time = "2025-12-24T16:56:27.148Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/3a/7ba8270af8a13ea1d19e38c11e10cb564cec11f5be81539ccc76b973f94f/git_notes_memory-0.9.1-py3-none-any.whl", hash = "sha256:b6d3fa2bcaa839f2b53dc666f6c05cb2d450fa622553c8881e5875dbc47f7de7", size = 152593, upload-time = "2025-12-24T16:56:25.724Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic", marker = "extra == 'subconsciousness'", specifier = ">=0.40.0" },
+    { name = "bandit", marker = "extra == 'dev'", specifier = ">=1.8.0" },
+    { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.0" },
+    { name = "bump-my-version", marker = "extra == 'dev'", specifier = ">=1.1.0" },
+    { name = "detect-secrets", specifier = ">=1.4.0" },
+    { name = "einops", specifier = ">=0.8.1" },
+    { name = "httpx", marker = "extra == 'subconsciousness'", specifier = ">=0.28.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.19.0" },
+    { name = "numpy", marker = "extra == 'consolidation'", specifier = ">=2.0.0" },
+    { name = "openai", marker = "extra == 'subconsciousness'", specifier = ">=1.58.0" },
+    { name = "opentelemetry-api", marker = "extra == 'monitoring'", specifier = ">=1.29.0" },
+    { name = "opentelemetry-exporter-otlp", marker = "extra == 'monitoring'", specifier = ">=1.29.0" },
+    { name = "opentelemetry-sdk", marker = "extra == 'monitoring'", specifier = ">=1.29.0" },
+    { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.9.0" },
+    { name = "prometheus-client", marker = "extra == 'monitoring'", specifier = ">=0.21.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
+    { name = "pyyaml", specifier = ">=6.0.2" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.0" },
+    { name = "scikit-learn", marker = "extra == 'consolidation'", specifier = ">=1.5.0" },
+    { name = "sentence-transformers", specifier = ">=3.0.0" },
+    { name = "sqlite-vec", specifier = ">=0.1.6" },
+    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12" },
+]
+provides-extras = ["consolidation", "dev", "monitoring", "subconsciousness"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "bandit", specifier = ">=1.8.0" },
+    { name = "build", specifier = ">=1.2.0" },
+    { name = "bump-my-version", specifier = ">=1.1.0" },
+    { name = "hypothesis", specifier = ">=6.148.8" },
+    { name = "mypy", specifier = ">=1.19.0" },
+    { name = "pip-audit", specifier = ">=2.9.0" },
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-asyncio", specifier = ">=1.0.0" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "ruff", specifier = ">=0.14.0" },
+    { name = "types-pyyaml", specifier = ">=6.0.12" },
 ]
 
 [[package]]
@@ -1313,7 +1377,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.40.0" },
     { name = "datasets", specifier = ">=2.14.0" },
-    { name = "git-notes-memory", specifier = ">=0.9.1" },
+    { name = "git-notes-memory", editable = "../git-notes-memory" },
     { name = "httpx", specifier = ">=0.25.0" },
     { name = "matplotlib", marker = "extra == 'publication'", specifier = ">=3.7.0" },
     { name = "memory-benchmark-harness", extras = ["dev", "publication"], marker = "extra == 'all'" },

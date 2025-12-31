@@ -145,3 +145,6 @@ dev = [
     "ruff>=0.14.10",
     "types-pyyaml>=6.0.12.20250915",
 ]
+
+[tool.uv.sources]
+git-notes-memory = { path = "../git-notes-memory", editable = true }
