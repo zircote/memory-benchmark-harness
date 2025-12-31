@@ -941,6 +941,52 @@ class GitNotesAdapter(MemorySystemAdapter):
 
         logger.info("Inserted %d memories total", total_inserted)
 
+        # Phase 4: Extract and store entities and temporal refs for retrieval improvements
+        # RET-E-002, RET-T-002: These enable entity and temporal boosting during search
+        try:
+            from git_notes_memory.retrieval.entity_extractor import EntityExtractor
+            from git_notes_memory.retrieval.entity_store import EntityStore
+            from git_notes_memory.retrieval.temporal_extractor import TemporalExtractor
+            from git_notes_memory.retrieval.temporal_store import TemporalStore
+
+            conn = self._index_service._conn
+            if conn is not None:
+                entity_extractor = EntityExtractor(use_spacy=False)
+                entity_store = EntityStore(conn)
+                temporal_extractor = TemporalExtractor()
+                temporal_store = TemporalStore(conn)
+
+                entity_count = 0
+                temporal_count = 0
+
+                for memory in memories:
+                    # Extract and store entities
+                    try:
+                        entities = entity_extractor.extract(memory.content)
+                        if entities:
+                            entity_store.store_for_memory(memory.id, entities)
+                            entity_count += len(entities)
+                    except Exception as e:
+                        logger.debug("Entity extraction failed for %s: %s", memory.id, e)
+
+                    # Extract and store temporal refs
+                    try:
+                        temporal_refs = temporal_extractor.extract(memory.content)
+                        if temporal_refs:
+                            temporal_store.store_for_memory(memory.id, temporal_refs)
+                            temporal_count += len(temporal_refs)
+                    except Exception as e:
+                        logger.debug("Temporal extraction failed for %s: %s", memory.id, e)
+
+                logger.info(
+                    "Extracted %d entities and %d temporal refs from %d memories",
+                    entity_count,
+                    temporal_count,
+                    len(memories),
+                )
+        except Exception as e:
+            logger.warning("Entity/temporal extraction failed (search may be less accurate): %s", e)
+
         # Update results to reflect indexed status
         for op_result in results:
             if op_result.success and op_result.metadata:
