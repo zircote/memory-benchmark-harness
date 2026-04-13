@@ -34,7 +34,7 @@ dev = [
     "pre-commit>=3.4.0",
 ]
 publication = [
-    "matplotlib>=3.7.0",
+    "matplotlib>=3.10.8",
 ]
 all = [
     "memory-benchmark-harness[dev,publication]",
